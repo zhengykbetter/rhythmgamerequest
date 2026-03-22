@@ -60,6 +60,18 @@ def get_file_md5(file_path):
             md5.update(chunk)
     return md5.hexdigest()
 
+# ===================== 辅助函数：统计CSV非空行数 =====================
+def count_csv_rows(file_path):
+    """统计CSV文件非空行数（跳过空行，避免干扰）"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            # 统计非空行（strip()后长度>0）
+            row_count = sum(1 for line in f if line.strip())
+        return row_count
+    except Exception as e:
+        logger.error(f"统计{file_path}行数失败：{str(e)}")
+        return 0
+
 # ===================== 核心函数（引用配置） =====================
 def pull_private_csv_repo():
     """拉取私有CSV仓库（引用配置文件的分支/路径）"""
@@ -116,10 +128,14 @@ def copy_csv_to_main_repo():
             copy_summary["失败"].append(csv_file)
             continue
         
-        # 获取源文件信息
-        file_size = os.path.getsize(source_path) / 1024  # 转为KB
+        # 获取源文件核心信息（新增：行数、MB单位大小、精确到分钟的时间）
+        file_size_kb = os.path.getsize(source_path) / 1024  # 原有KB
+        file_size_mb = round(file_size_kb / 1024, 2)        # 新增MB（保留2位小数）
+        csv_row_count = count_csv_rows(source_path)         # 新增：CSV总行数
+        precise_time = datetime.now().strftime("%Y-%m-%d %H:%M")  # 精确到分钟的时间
         source_md5 = get_file_md5(source_path)
-        logger.debug(f"源文件{csv_file}信息：大小={file_size:.2f}KB，MD5={source_md5}")
+        
+        logger.debug(f"源文件{csv_file}信息：大小={file_size_kb:.2f}KB（{file_size_mb}MB），总行数={csv_row_count}，MD5={source_md5}")
         
         # 复制文件
         shutil.copy2(source_path, target_path)
@@ -129,10 +145,12 @@ def copy_csv_to_main_repo():
             target_md5 = get_file_md5(target_path)
             copy_summary["成功"].append(csv_file)
             copy_summary["MD5"].append(f"{csv_file}: 源{source_md5} → 目标{target_md5}")
-            logger.info(f"CSV复制成功：{csv_file}（大小={file_size:.2f}KB，MD5校验：{source_md5 == target_md5}）")
+            
+            # 增强日志：包含时间（分钟）、文件名、总行数、大小（MB）、MD5校验结果
+            logger.info(f"[{precise_time}] CSV复制成功 | 文件名：{csv_file} | 总行数：{csv_row_count} | 文件大小：{file_size_mb}MB | MD5校验：{source_md5 == target_md5} | 源路径：{source_path} → 目标路径：{target_path}")
         else:
             copy_summary["失败"].append(csv_file)
-            logger.error(f"CSV复制失败：目标文件{target_path}未生成")
+            logger.error(f"[{precise_time}] CSV复制失败：目标文件{target_path}未生成 | 文件名：{csv_file}")
     
     # 汇总复制结果
     logger.info(f"CSV复制汇总：成功{len(copy_summary['成功'])}个，失败{len(copy_summary['失败'])}个")
