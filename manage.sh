@@ -9,23 +9,60 @@
 # ./manage.sh help          # 查看帮助
 
 # ===================== 基础配置：确保Python路径正确 =====================
+# 强制将主仓库根目录加入Python路径（解决ModuleNotFoundError）
 export PYTHONPATH=$(pwd):$PYTHONPATH
 # 临时配置文件路径（动态生成cron配置用）
 TEMP_CRON_FILE="./scripts/temp_cron_config"
 
-# ===================== 从settings.py读取所有配置 =====================
+# ===================== 从settings.py读取所有配置（带异常处理） =====================
 # 读取Python执行路径
-PYTHON_PATH=$(python3 -c "from config.settings import PYTHON_EXEC_PATH; print(PYTHON_EXEC_PATH)" 2>/dev/null)
+PYTHON_PATH=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import PYTHON_EXEC_PATH
+print(PYTHON_EXEC_PATH)
+" 2>/dev/null)
+
 # 读取同步脚本路径
-SYNC_SCRIPT=$(python3 -c "from config.settings import MAIN_REPO_ROOT; print(MAIN_REPO_ROOT / 'scripts' / 'sync_csv_from_remote.py')" 2>/dev/null)
+SYNC_SCRIPT=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import MAIN_REPO_ROOT
+print(f'{MAIN_REPO_ROOT}/scripts/sync_csv_from_remote.py')
+" 2>/dev/null)
+
 # 读取日志目录
-LOG_DIR=$(python3 -c "from config.settings import LOG_DIR; print(LOG_DIR)" 2>/dev/null)
+LOG_DIR=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import LOG_DIR
+print(LOG_DIR)
+" 2>/dev/null)
+
 # 读取cron备份目录
-CRON_BACKUP_DIR=$(python3 -c "from config.settings import CRON_BACKUP_DIR; print(CRON_BACKUP_DIR)" 2>/dev/null)
-# 读取cron任务列表（按行输出）
-CRON_TASKS=$(python3 -c "from config.settings import CRON_TASKS; [print(task) for task in CRON_TASKS]" 2>/dev/null)
+CRON_BACKUP_DIR=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import CRON_BACKUP_DIR
+print(CRON_BACKUP_DIR)
+" 2>/dev/null)
+
+# 读取cron任务列表（修复核心：改用简单循环输出，兼容终端）
+CRON_TASKS=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import CRON_TASKS
+for task in CRON_TASKS:
+    print(task.strip())
+" 2>/dev/null)
+
 # 读取cron任务特征标记
-CRON_TASK_MARK=$(python3 -c "from config.settings import CRON_TASK_MARK; print(CRON_TASK_MARK)" 2>/dev/null)
+CRON_TASK_MARK=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import CRON_TASK_MARK
+print(CRON_TASK_MARK)
+" 2>/dev/null)
 
 # 颜色输出
 RED='\033[0;31m'
@@ -45,17 +82,24 @@ starter() {
     if [ -f "${SYNC_SCRIPT}" ]; then
         chmod +x ${SYNC_SCRIPT}
         echo -e "${GREEN}✅ 已给${SYNC_SCRIPT}赋予执行权限${NC}"
+    else
+        echo -e "${YELLOW}ℹ️  同步脚本${SYNC_SCRIPT}不存在，跳过权限设置${NC}"
     fi
     
     # 给CSV→DB脚本加权限（可选）
-    CSV_TO_DB_SCRIPT=$(python3 -c "from config.settings import MAIN_REPO_ROOT; print(MAIN_REPO_ROOT / 'scripts' / 'csv_to_db.py')" 2>/dev/null)
+    CSV_TO_DB_SCRIPT=$(python3 -c "
+    import sys
+    sys.path.append('$(pwd)')
+    from config.settings import MAIN_REPO_ROOT
+    print(f'{MAIN_REPO_ROOT}/scripts/csv_to_db.py')
+    " 2>/dev/null)
     if [ -f "${CSV_TO_DB_SCRIPT}" ]; then
         chmod +x ${CSV_TO_DB_SCRIPT}
         echo -e "${GREEN}✅ 已给${CSV_TO_DB_SCRIPT}赋予执行权限${NC}"
     fi
     
     # 创建日志目录
-    if [ -n "${LOG_DIR}" ]; then
+    if [ -n "${LOG_DIR}" ] && [ "${LOG_DIR}" != "None" ]; then
         mkdir -p ${LOG_DIR}
         echo -e "${GREEN}✅ 已创建日志目录：${LOG_DIR}${NC}"
     else
@@ -76,13 +120,19 @@ config_cron() {
     echo -e "${YELLOW}===== 开始配置定时任务（从settings.py读取）=====${NC}"
     
     # 1. 验证配置是否读取成功
-    if [ -z "${CRON_TASKS}" ]; then
-        echo -e "${RED}❌ 读取cron配置失败！请检查settings.py中的CRON_TASKS配置${NC}"
+    if [ -z "${CRON_TASKS}" ] || [ "${CRON_TASKS}" = "None" ]; then
+        echo -e "${RED}❌ 读取cron配置失败！请执行以下命令手动验证：${NC}"
+        echo -e "${RED}python3 -c \"import sys; sys.path.append('$(pwd)'); from config.settings import CRON_TASKS; print(CRON_TASKS)\"${NC}"
         exit 1
     fi
     
     # 2. 创建cron备份目录
-    mkdir -p ${CRON_BACKUP_DIR}
+    if [ -n "${CRON_BACKUP_DIR}" ] && [ "${CRON_BACKUP_DIR}" != "None" ]; then
+        mkdir -p ${CRON_BACKUP_DIR}
+    else
+        CRON_BACKUP_DIR="./logs"
+        mkdir -p ${CRON_BACKUP_DIR}
+    fi
     # 备份原有crontab
     BACKUP_FILE="${CRON_BACKUP_DIR}/cron_backup_$(date +%Y%m%d_%H%M%S).log"
     crontab -l > ${BACKUP_FILE} 2>/dev/null
@@ -93,7 +143,7 @@ config_cron() {
     
     # 4. 动态生成新的cron配置文件
     echo "${EXISTING_CRONTAB}" > ${TEMP_CRON_FILE}
-    # 添加本项目的cron任务
+    # 添加本项目的cron任务（空行分隔，避免格式错误）
     echo -e "\n# 节奏游戏项目定时任务（自动生成，请勿手动修改）" >> ${TEMP_CRON_FILE}
     echo "${CRON_TASKS}" >> ${TEMP_CRON_FILE}
     
@@ -103,8 +153,8 @@ config_cron() {
         echo -e "${GREEN}✅ 定时任务配置成功！${NC}"
         # 删除临时文件
         rm -f ${TEMP_CRON_FILE}
-        # 展示当前配置
-        echo -e "${YELLOW}当前定时任务配置（仅本项目）：${NC}"
+        # 展示当前配置（仅本项目）
+        echo -e "${YELLOW}当前本项目定时任务配置：${NC}"
         crontab -l | grep -A 100 "${CRON_TASK_MARK}"
     else
         echo -e "${RED}❌ 定时任务配置失败！已恢复原有配置${NC}"
@@ -122,7 +172,11 @@ check_cron() {
     crontab -l | grep -A 100 "${CRON_TASK_MARK}" || echo -e "${RED}❌ 未检测到本项目定时任务${NC}"
     
     echo -e "\n${YELLOW}===== settings.py中的cron配置 =====${NC}"
-    echo "${CRON_TASKS}" || echo -e "${RED}❌ 读取settings.py配置失败${NC}"
+    if [ -n "${CRON_TASKS}" ]; then
+        echo "${CRON_TASKS}"
+    else
+        echo -e "${RED}❌ 读取settings.py配置失败${NC}"
+    fi
 }
 
 # 手动同步CSV
@@ -133,6 +187,11 @@ sync_now() {
     echo -e "${YELLOW}===== 开始手动执行CSV同步 =====${NC}"
     # 确保日志目录存在
     mkdir -p ${LOG_DIR}
+    
+    if [ -z "${PYTHON_PATH}" ] || [ ! -f "${SYNC_SCRIPT}" ]; then
+        echo -e "${RED}❌ 同步脚本路径或Python路径配置错误！${NC}"
+        exit 1
+    fi
     
     ${PYTHON_PATH} ${SYNC_SCRIPT}
     if [ $? -eq 0 ]; then
@@ -146,6 +205,13 @@ sync_now() {
 # 取消本项目cron任务
 cancel_cron() {
     echo -e "${YELLOW}===== 开始取消本项目的crontab任务 =====${NC}"
+    # 备份目录容错
+    if [ -n "${CRON_BACKUP_DIR}" ] && [ "${CRON_BACKUP_DIR}" != "None" ]; then
+        mkdir -p ${CRON_BACKUP_DIR}
+    else
+        CRON_BACKUP_DIR="./logs"
+        mkdir -p ${CRON_BACKUP_DIR}
+    fi
     # 备份当前crontab
     BACKUP_FILE="${CRON_BACKUP_DIR}/cron_backup_before_cancel_$(date +%Y%m%d_%H%M%S).log"
     crontab -l > ${BACKUP_FILE} 2>/dev/null

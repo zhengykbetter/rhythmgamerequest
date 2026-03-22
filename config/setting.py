@@ -39,11 +39,10 @@ PYTHON_EXEC_PATH = "/usr/bin/python3"
 # Cron备份目录（存放crontab备份文件）
 CRON_BACKUP_SUBDIR = "logs"
 CRON_BACKUP_DIR = MAIN_REPO_ROOT / CRON_BACKUP_SUBDIR
-# Cron任务配置（核心：所有定时任务集中定义）
+# Cron任务配置（核心：所有定时任务集中定义，语法简化）
 CRON_TASKS = [
-    # 格式："执行时间 | 执行命令 | 日志文件"
-    f"0 2 * * * {PYTHON_EXEC_PATH} {MAIN_REPO_ROOT / 'scripts' / 'sync_csv_from_remote.py'} >> {LOG_DIR / 'crontab_sync.log'} 2>&1",
-    f"5 2 * * * {PYTHON_EXEC_PATH} {MAIN_REPO_ROOT / 'scripts' / 'csv_to_db.py'} >> {LOG_DIR / 'crontab_db.log'} 2>&1"
+    f"0 2 * * * {PYTHON_EXEC_PATH} {MAIN_REPO_ROOT}/scripts/sync_csv_from_remote.py >> {LOG_DIR}/crontab_sync.log 2>&1",
+    f"5 2 * * * {PYTHON_EXEC_PATH} {MAIN_REPO_ROOT}/scripts/csv_to_db.py >> {LOG_DIR}/crontab_db.log 2>&1"
 ]
 # Cron任务特征标记（用于精准匹配/删除本项目任务）
 CRON_TASK_MARK = str(MAIN_REPO_ROOT) + "/"
