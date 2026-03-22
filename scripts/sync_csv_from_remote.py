@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-主仓库CSV同步脚本（开源+详细日志）
-功能：
-1. 拉取私有CSV仓库的最新CSV
-2. 校验CSV完整性（存在性+大小+MD5）
-3. 复制CSV到主仓库的data_csv目录（git忽略）
-4. 记录超详细同步日志（文件大小/耗时/MD5/复制结果）
+主仓库CSV同步脚本（开源+配置分离）
 """
-import os
 import sys
 import shutil
 import logging
@@ -16,24 +10,23 @@ import subprocess
 import hashlib
 import time
 from datetime import datetime
-from pathlib import Path
 
-# ===================== 核心配置 =====================
-PRIVATE_CSV_REPO = Path("/opt/csv_repo")
-CSV_SOURCE_DIR = PRIVATE_CSV_REPO / "data"
-CSV_TARGET_DIR = Path(__file__).parent.parent / "data_csv"
-LOG_DIR = Path(__file__).parent.parent / "logs"
-REQUIRED_CSV = ["game_info.csv", "song_info.csv"]
-CSV_REPO_BRANCH = "main"
+# 新增：添加主仓库根目录到Python路径，确保能导入config
+sys.path.append(str(__file__).rsplit('/', 2)[0])  # 让脚本能找到config目录
+from config.settings import (
+    CSV_SOURCE_DIR, CSV_TARGET_DIR, LOG_DIR,
+    REQUIRED_CSV_FILES, CSV_REPO_BRANCH,
+    PRIVATE_CSV_REPO_ROOT, LOG_FILE_PREFIX, LOG_FILE_SUFFIX
+)
 
 # ===================== 详细日志配置 =====================
 def setup_logger():
-    """配置超详细日志：包含时间戳/级别/模块/耗时/详细信息"""
+    """配置超详细日志：引用配置文件的路径"""
     os.makedirs(LOG_DIR, exist_ok=True)
-    log_file = LOG_DIR / f"sync_csv_{datetime.now().strftime('%Y%m%d')}.log"
+    log_file = LOG_DIR / f"{LOG_FILE_PREFIX}{datetime.now().strftime('%Y%m%d')}{LOG_FILE_SUFFIX}"
     
     logger = logging.getLogger("main_repo_csv_sync")
-    logger.setLevel(logging.DEBUG)  # 调试级别，记录所有细节
+    logger.setLevel(logging.DEBUG)
     if logger.handlers:
         return logger
     
@@ -41,13 +34,13 @@ def setup_logger():
     fmt = "%(asctime)s - %(levelname)s - [耗时：%(relativeCreated)dms] - 同步流程：%(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
     
-    # 文件日志（保存所有细节，开源可展示）
+    # 文件日志（保存所有细节）
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
-    # 控制台日志（简化输出，便于手动执行查看）
+    # 控制台日志（简化输出）
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt=datefmt))
-    console_handler.setLevel(logging.INFO)  # 控制台只显示INFO及以上
+    console_handler.setLevel(logging.INFO)
     
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
@@ -66,15 +59,15 @@ def get_file_md5(file_path):
             md5.update(chunk)
     return md5.hexdigest()
 
-# ===================== 核心函数（强化日志） =====================
+# ===================== 核心函数（引用配置） =====================
 def pull_private_csv_repo():
-    """拉取私有CSV仓库（详细日志）"""
+    """拉取私有CSV仓库（引用配置文件的分支/路径）"""
     logger.info("===== 开始拉取私有CSV仓库 ======")
     start_time = time.time()
     try:
         result = subprocess.run(
             ["git", "pull", "origin", CSV_REPO_BRANCH],
-            cwd=PRIVATE_CSV_REPO,
+            cwd=PRIVATE_CSV_REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=30
@@ -98,8 +91,8 @@ def pull_private_csv_repo():
         return False
 
 def copy_csv_to_main_repo():
-    """复制CSV（详细日志：文件大小/MD5/复制结果）"""
-    logger.info("===== 开始复制CSV到主仓库data_csv目录 ======")
+    """复制CSV（引用配置文件的路径/文件列表）"""
+    logger.info("===== 开始复制CSV到主仓库目标目录 ======")
     os.makedirs(CSV_TARGET_DIR, exist_ok=True)
     copy_summary = {"成功": [], "失败": [], "MD5": []}
     
@@ -110,8 +103,8 @@ def copy_csv_to_main_repo():
         for f in old_files:
             os.remove(CSV_TARGET_DIR / f)
     
-    # 复制新CSV并记录细节
-    for csv_file in REQUIRED_CSV:
+    # 复制新CSV并记录细节（引用配置的文件列表）
+    for csv_file in REQUIRED_CSV_FILES:
         source_path = CSV_SOURCE_DIR / csv_file
         target_path = CSV_TARGET_DIR / csv_file
         logger.debug(f"处理文件：源路径={source_path}，目标路径={target_path}")
@@ -147,7 +140,7 @@ def copy_csv_to_main_repo():
     return len(copy_summary["失败"]) == 0
 
 def main():
-    """主流程（详细日志）"""
+    """主流程"""
     logger.info("===== 主仓库CSV同步流程启动 ======")
     start_total = time.time()
     
