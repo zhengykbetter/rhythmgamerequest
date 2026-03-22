@@ -1,0 +1,9 @@
+# 主仓库.gitignore（开源仓库）
+# 忽略CSV数据目录（仅存复制过来的CSV，不进git）
+data_csv/
+# 忽略同步日志（可选，若不想开源日志）
+logs/
+# 忽略虚拟环境/缓存（通用）
+__pycache__/
+venv/
+*.pyc

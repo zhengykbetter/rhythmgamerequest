@@ -1,0 +1,8 @@
+# 1. CSV同步：每日凌晨2点执行（拉取私有CSV+复制到主仓库）
+# 日志：/opt/main_repo/logs/crontab_sync.log
+0 2 * * * /usr/bin/python3 /opt/main_repo/scripts/sync_csv_from_remote.py >> /opt/main_repo/logs/crontab_sync.log 2>&1
+
+# 暂未完成
+# 2. CSV→数据库：每日凌晨2点10分执行（读取CSV写入数据库）
+# 日志：/opt/main_repo/logs/crontab_db.log
+# 10 2 * * * /usr/bin/python3 /opt/main_repo/scripts/csv_to_db.py >> /opt/main_repo/logs/crontab_db.log 2>&1
