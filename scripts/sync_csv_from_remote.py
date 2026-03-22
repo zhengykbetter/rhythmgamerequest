@@ -4,6 +4,7 @@
 主仓库CSV同步脚本（开源+配置分离）
 """
 import sys
+import os
 import shutil
 import logging
 import subprocess
@@ -11,8 +12,8 @@ import hashlib
 import time
 from datetime import datetime
 
-# 新增：添加主仓库根目录到Python路径，确保能导入config
-sys.path.append(str(__file__).rsplit('/', 2)[0])  # 让脚本能找到config目录
+# 新增：强制添加主仓库根目录到Python路径（解决ModuleNotFoundError）
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import (
     CSV_SOURCE_DIR, CSV_TARGET_DIR, LOG_DIR,
     REQUIRED_CSV_FILES, CSV_REPO_BRANCH,

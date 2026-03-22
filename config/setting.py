@@ -33,11 +33,20 @@ LOG_DIR = MAIN_REPO_ROOT / LOG_SUBDIR
 LOG_FILE_PREFIX = "sync_csv_"
 LOG_FILE_SUFFIX = ".log"
 
-# ===================== 定时任务配置 =====================
-# Cron配置文件路径（主仓库下）
-CRON_CONFIG_FILE = MAIN_REPO_ROOT / "scripts" / "cron_config"
+# ===================== 定时任务（cron）配置 =====================
 # Python执行路径（服务器实际路径）
 PYTHON_EXEC_PATH = "/usr/bin/python3"
+# Cron备份目录（存放crontab备份文件）
+CRON_BACKUP_SUBDIR = "logs"
+CRON_BACKUP_DIR = MAIN_REPO_ROOT / CRON_BACKUP_SUBDIR
+# Cron任务配置（核心：所有定时任务集中定义）
+CRON_TASKS = [
+    # 格式："执行时间 | 执行命令 | 日志文件"
+    f"0 2 * * * {PYTHON_EXEC_PATH} {MAIN_REPO_ROOT / 'scripts' / 'sync_csv_from_remote.py'} >> {LOG_DIR / 'crontab_sync.log'} 2>&1",
+    f"5 2 * * * {PYTHON_EXEC_PATH} {MAIN_REPO_ROOT / 'scripts' / 'csv_to_db.py'} >> {LOG_DIR / 'crontab_db.log'} 2>&1"
+]
+# Cron任务特征标记（用于精准匹配/删除本项目任务）
+CRON_TASK_MARK = str(MAIN_REPO_ROOT) + "/"
 
 # ===================== 数据库配置（CSV→DB） =====================
 # 敏感信息通过环境变量读取，不硬编码（.env文件git忽略）
