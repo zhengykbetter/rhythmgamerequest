@@ -6,14 +6,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # 项目根目录
 MAIN_REPO_ROOT = str(BASE_DIR)
 PYTHON_EXEC_PATH = "python3"  # Python执行路径
 
-# ===================== 日志配置（2026-03-23 增量更新：补全所有日志变量） =====================
-LOG_DIR = os.path.join(BASE_DIR, "logs")
-LOG_FILE_PREFIX = "sync_csv_"  # 同步CSV脚本的日志文件前缀（解决历史报错）
-LOG_FILE_SUFFIX = ".log"       # 新增：日志文件后缀（解决本次报错，如.log）
-LOG_DATE_FORMAT = "%Y%m%d"     # 新增：日志文件名中的日期格式（如20260323）
-LOG_ENCODING = "utf-8"         # 新增：日志文件编码（避免中文乱码）
-os.makedirs(LOG_DIR, exist_ok=True)
-CRON_BACKUP_DIR = LOG_DIR  # Cron备份目录
+# ===================== 日志配置（2026-03-23 增量更新：修复路径拼接类型错误） =====================
+LOG_DIR = Path(BASE_DIR) / "logs"  # 改为Path对象（解决脚本/拼接报错），原有str改为Path
+LOG_FILE_PREFIX = "sync_csv_"      # 保留：日志文件前缀
+LOG_FILE_SUFFIX = ".log"           # 保留：日志文件后缀
+LOG_DATE_FORMAT = "%Y%m%d"         # 保留：日志文件名中的日期格式
+LOG_ENCODING = "utf-8"             # 保留：日志文件编码
+os.makedirs(LOG_DIR, exist_ok=True)# 兼容：os.makedirs支持Path对象
+CRON_BACKUP_DIR = str(LOG_DIR)     # 兼容：转为字符串，不影响其他依赖str的逻辑
 
 # ===================== CSV 全量配置（适配你的场景，无冗余） =====================
 # 1. 核心本地目录（CSV存储/归档）
