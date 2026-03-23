@@ -1,9 +1,14 @@
-# 主仓库.gitignore（开源仓库）
-# 忽略CSV数据目录（仅存复制过来的CSV，不进git）
+# /你的主项目根目录/.gitignore
+# 敏感配置
+
+# CSV目标目录（同步后的文件，无需提交）
 data_csv/
-# 忽略同步日志（可选，若不想开源日志）
+# 日志目录
 logs/
-# 忽略虚拟环境/缓存（通用）
-__pycache__/
+# 虚拟环境
 venv/
+# CSV存档目录
+data_csv/archive/
+# 临时文件
 *.pyc
+__pycache__/
