@@ -33,8 +33,6 @@ OUTPUT_PATHS = {
     "game_linkage_rel": os.path.join(CSV_BASE_PATH, "game_linkage_rel.csv")
 }
 
-# 补充：定义MySQL配置（如果没定义也要加）
-MYSQL_CONFIG = "mysql+pymysql://你的用户名:你的密码@你的数据库IP:端口号/rhythmgame?charset=utf8mb4"
 
 # ===================== 路径配置 =====================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
