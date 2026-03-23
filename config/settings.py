@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
 
-# ===================== 基础路径（核心，保留） =====================
+# 基础路径（核心：新增 MAIN_REPO_ROOT 定义）
 BASE_DIR = Path(__file__).resolve().parent.parent
+MAIN_REPO_ROOT = str(BASE_DIR)  # 新增这一行，与BASE_DIR保持一致
+
+# 其余原有配置不变（CSV/DB/CRON等）
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 

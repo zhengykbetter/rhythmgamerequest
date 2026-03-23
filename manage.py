@@ -33,10 +33,21 @@ NC = '\033[0m'  # 重置颜色
 def run_shell_cmd(cmd, capture_output=False):
     """执行shell命令，返回(输出, 错误, 退出码)"""
     if capture_output:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        # 优化：使用 list 传递参数，避免sh解析错误
+        if isinstance(cmd, str):
+            cmd = cmd.split()
+        result = subprocess.run(
+            cmd, shell=False, capture_output=True, text=True, 
+            executable="/bin/bash"  # 指定bash解析，避免sh的语法兼容问题
+        )
         return result.stdout, result.stderr, result.returncode
     else:
-        subprocess.run(cmd, shell=True)
+        if isinstance(cmd, str):
+            cmd = cmd.split()
+        subprocess.run(
+            cmd, shell=False, 
+            executable="/bin/bash"
+        )
         return "", "", 0
 
 def get_full_config():
@@ -48,9 +59,9 @@ def get_full_config():
         "LOG_DIR": os.path.join(os.getcwd(), "logs"),
         "CRON_BACKUP_DIR": os.path.join(os.getcwd(), "logs"),
         "CRON_TASK_MARK": "# 节奏游戏项目定时任务",
-        # 默认CRON：每天凌晨2点执行auto，日志输出到logs
+        # 默认CRON：每天凌晨2点执行auto，日志输出到logs（修复重定向语法）
         "CRON_TASKS": [
-            f"0 2 * * * python3 {os.path.join(os.getcwd(), 'manage.py')} auto >> {os.path.join(os.getcwd(), 'logs', 'auto_cron.log')} 2>&1"
+            f"0 2 * * * {os.path.join(os.getcwd(), 'venv/bin/python3') if os.path.exists(os.path.join(os.getcwd(), 'venv/bin/python3')) else 'python3'} {os.path.join(os.getcwd(), 'manage.py')} auto > {os.path.join(os.getcwd(), 'logs', 'auto_cron.log')} 2>&1"
         ],
         # 脚本路径（基于项目根目录）
         "SYNC_SCRIPT": os.path.join(os.getcwd(), "scripts", "sync_csv_from_remote.py"),
