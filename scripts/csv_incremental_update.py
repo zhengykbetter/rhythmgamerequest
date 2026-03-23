@@ -236,116 +236,55 @@ def infer_csv_fields(table_name):
     return field_info
 
 def generate_create_table_sql(table_name):
-    """动态生成建表SQL（从CSV推断字段+结合业务规则）"""
-    # 1. 从CSV推断字段信息
-    field_info = infer_csv_fields(table_name)
-    rules = TABLE_RULES[table_name]
-    primary_key = rules["primary_key"]
-    auto_cols = rules["auto_cols"]
-    foreign_keys = rules["foreign_keys"]
-    varchar_length = rules.get("varchar_length", {})
+    """生成建表SQL（完全基于TABLE_RULES的field_types，无CSV依赖）"""
+    # 1. 获取当前表的规则配置
+    table_rule = TABLE_RULES[table_name]
     
-    # 2. 拼接字段定义
-    field_defs = []
-    # 先处理CSV中的字段
-    for col, dtype in field_info.items():
-        # 跳过自动维护字段（后续单独加）
-        if col in auto_cols:
-            continue
-        
-        # 获取MySQL类型
-        if dtype == "object":
-            # 自定义VARCHAR长度，默认255
-            length = varchar_length.get(col, 255)
-            mysql_type = TYPE_MAPPING[dtype].format(length=length)
+    # 2. 从field_types提取字段（核心：不再读CSV，直接用显式定义的字段）
+    fields = list(table_rule["field_types"].keys())
+    
+    # 3. 构建字段SQL（显式指定类型，解决自动推断错误）
+    field_sql = []
+    for field in fields:
+        field_type = table_rule["field_types"][field]
+        # 主键处理
+        if field == table_rule["primary_key"]:
+            field_sql.append(f"`{field}` {field_type} NOT NULL PRIMARY KEY COMMENT '主键'")
+        # 自动时间戳字段特殊处理
+        elif field == "update_timestamp":
+            field_sql.append(f"`{field}` {field_type} DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '系统更新时间戳'")
+        # 普通字段
         else:
-            mysql_type = TYPE_MAPPING.get(dtype, "VARCHAR(255)")
-        
-        # 主键约束
-        if col == primary_key:
-            if table_name == "game_info":  # game_info主键为INT
-                field_def = f"{col} {mysql_type} PRIMARY KEY COMMENT '主键'"
-            else:  # 其余主键为VARCHAR
-                field_def = f"{col} {mysql_type} NOT NULL PRIMARY KEY COMMENT '主键'"
-        else:
-            # 非主键字段：非空约束（仅核心字段）
-            not_null = "NOT NULL" if col in ["游戏", "歌名", "作者本名", "游戏1名称", "游戏2名称"] else ""
-            field_def = f"{col} {mysql_type} {not_null} COMMENT '{col}'"
-        field_defs.append(field_def)
+            field_sql.append(f"`{field}` {field_type} COMMENT '{field}'")
     
-    # 3. 添加自动维护字段
-    for auto_col in auto_cols:
-        if auto_col == "最新更新时间":
-            field_defs.append(f"{auto_col} DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '数据最后改动时间（自动刷新）'")
-        elif auto_col == "update_timestamp":
-            field_defs.append(f"{auto_col} DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '系统更新时间戳'")
+    # 4. 拼接外键（修正写法：中文字段加反引号）
+    if table_rule["foreign_keys"]:
+        field_sql.extend(table_rule["foreign_keys"])
     
-    # 4. 添加外键约束
-    field_defs.extend(foreign_keys)
-    
-    # 5. 拼接完整SQL
+    # 5. 组装完整SQL
     create_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
-            {', '.join(field_defs)}
+            {', '.join(field_sql)}
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='{table_name}（自动生成）';
     """
     return create_sql
 
-def init_table(table_name):
-    """初始化单表（完全基于TABLE_RULES，不依赖CSV/OUTPUT_PATHS）"""
-    # 1. 获取当前表的规则配置
-    table_rule = TABLE_RULES[table_name]
-    
-    # 2. 从field_types提取字段列表（核心：不再读CSV，直接用显式定义的字段）
-    fields = list(table_rule["field_types"].keys())
-    
-    # 3. 构建建表SQL的字段部分（显式指定类型，解决推断错误）
-    field_sql_list = []
-    for field in fields:
-        # 获取显式定义的字段类型（如VARCHAR(50)、DATE）
-        field_type = table_rule["field_types"][field]
-        
-        # 主键处理
-        if field == table_rule["primary_key"]:
-            field_sql = f"`{field}` {field_type} NOT NULL PRIMARY KEY COMMENT '主键'"
-        # 自动时间戳字段特殊处理（update_timestamp）
-        elif field == "update_timestamp":
-            field_sql = f"`{field}` {field_type} DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '系统更新时间戳'"
-        # 普通字段
-        else:
-            field_sql = f"`{field}` {field_type} COMMENT '{field}'"
-        
-        field_sql_list.append(field_sql)
-    
-    # 4. 拼接外键（修正写法：中文字段加反引号，解决外键报错）
-    if table_rule["foreign_keys"]:
-        foreign_keys_sql = ", ".join(table_rule["foreign_keys"])
-        field_sql_list.append(foreign_keys_sql)
-    
-    # 5. 组装完整建表SQL
-    create_table_sql = f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            {', '.join(field_sql_list)}
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='{table_name}（自动生成）';
-    """
-    
-    # 6. 执行建表
-    try:
-        from sqlalchemy import create_engine, text
-        engine = create_engine(MYSQL_CONFIG)
-        with engine.connect() as conn:
-            conn.execute(text(create_table_sql))
-            conn.commit()
-        print(f"✅ 成功初始化表 {table_name}")
-    except Exception as e:
-        print(f"⚠️  初始化表 {table_name} 失败：{str(e)}")
-
 def init_all_tables():
-    """按指定顺序初始化所有表（解决外键依赖）"""
-    # 从TABLE_RULES获取建表顺序（基础表在前，关联表在后）
-    create_order = TABLE_RULES["create_order"]
-    for table_name in create_order:
-        init_table(table_name)
+    """全自动初始化表结构（从TABLE_RULES推断字段，无需硬编码/CSV/OUTPUT_PATHS）"""
+    engine = get_mysql_engine()  # 保留你原有API，不新增MYSQL_CONFIG
+    with engine.connect() as conn:
+        # 核心修改：按create_order遍历（基础表在前，关联表在后），解决外键依赖
+        create_order = TABLE_RULES["create_order"]
+        for table_name in create_order:
+            try:
+                # 动态生成建表SQL（重写该函数，基于field_types）
+                create_sql = generate_create_table_sql(table_name)
+                conn.execute(text(create_sql))
+                print(f"✅ 成功初始化表 {table_name}（自动生成表结构）")
+            except Exception as e:
+                print(f"⚠️  初始化表 {table_name} 失败：{str(e)}")
+        conn.commit()
+    print("\n✅ 所有表初始化完成！")
 
 # ===================== CSV处理通用函数（无修改） =====================
 def archive_csv(table_name, csv_path):
