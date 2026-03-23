@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 主仓库CSV同步脚本（开源+配置分离）
-核心修复：确保git pull在/opt/csv_repo执行，而非主项目目录
+核心修复：强制同步远程main分支，解决本地与远程不同步问题
 """
 import sys
 import os
@@ -73,53 +73,63 @@ def count_csv_rows(file_path):
         logger.error(f"统计{file_path}行数失败：{str(e)}")
         return 0
 
-# ===================== 核心函数（修复Git Pull目录问题） =====================
+# ===================== 核心函数（强制同步远程分支） =====================
 def pull_private_csv_repo():
-    """拉取私有CSV仓库（强制在/opt/csv_repo执行，增加目录验证）"""
-    logger.info("===== 开始拉取私有CSV仓库 ======")
+    """拉取私有CSV仓库（强制切main分支+fetch+reset --hard，解决不同步问题）"""
+    logger.info("===== 开始强制同步私有CSV仓库 ======")
     start_time = time.time()
     
-    # 核心修复1：验证私有仓库目录存在
+    # 验证私有仓库目录存在且是Git仓库
     if not os.path.exists(PRIVATE_CSV_REPO_ROOT):
         logger.error(f"私有CSV仓库目录不存在：{PRIVATE_CSV_REPO_ROOT}")
         return False
-    
-    # 核心修复2：验证该目录是Git仓库（存在.git子目录）
     git_dir = os.path.join(PRIVATE_CSV_REPO_ROOT, ".git")
     if not os.path.exists(git_dir):
-        logger.error(f"{PRIVATE_CSV_REPO_ROOT} 不是Git仓库（无.git目录），无法执行pull")
+        logger.error(f"{PRIVATE_CSV_REPO_ROOT} 不是Git仓库（无.git目录），无法执行同步")
         return False
     
-    # 核心修复3：强制指定cwd为私有仓库目录，执行git pull
-    try:
-        logger.debug(f"执行git pull的工作目录：{PRIVATE_CSV_REPO_ROOT}")
-        logger.debug(f"执行命令：git pull origin {CSV_REPO_BRANCH}")
-        
-        result = subprocess.run(
-            ["git", "pull", "origin", CSV_REPO_BRANCH],
-            cwd=str(PRIVATE_CSV_REPO_ROOT),  # 强制转为字符串，避免Path对象兼容问题
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        elapsed = round((time.time() - start_time) * 1000, 2)
-        
-        if result.returncode == 0:
-            logger.debug(f"Git拉取命令输出：{result.stdout.strip()}")
-            logger.info(f"私有CSV仓库拉取成功（耗时{elapsed}ms），分支：{CSV_REPO_BRANCH}，目录：{PRIVATE_CSV_REPO_ROOT}")
-            return True
-        else:
-            logger.error(f"Git拉取失败（耗时{elapsed}ms），错误信息：{result.stderr.strip()}")
-            logger.debug(f"Git完整错误输出：{result.stderr}")
+    # 定义要执行的Git命令列表（解决不同步的核心）
+    git_commands = [
+        ["git", "checkout", CSV_REPO_BRANCH],  # 确保在main分支
+        ["git", "fetch", "origin", CSV_REPO_BRANCH],  # 拉取远程最新代码
+        ["git", "reset", "--hard", f"origin/{CSV_REPO_BRANCH}"]  # 强制覆盖本地为远程版本
+    ]
+    command_names = ["切换分支", "拉取远程代码", "强制覆盖本地"]
+    
+    # 依次执行每个Git命令
+    for idx, (cmd, cmd_name) in enumerate(zip(git_commands, command_names)):
+        try:
+            logger.debug(f"执行{cmd_name}命令：{' '.join(cmd)} | 工作目录：{PRIVATE_CSV_REPO_ROOT}")
+            result = subprocess.run(
+                cmd,
+                cwd=str(PRIVATE_CSV_REPO_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            elapsed = round((time.time() - start_time) * 1000, 2)
+            
+            if result.returncode != 0:
+                logger.error(f"{cmd_name}失败（耗时{elapsed}ms），错误信息：{result.stderr.strip()}")
+                logger.debug(f"{cmd_name}完整错误输出：{result.stderr}")
+                return False
+            else:
+                logger.debug(f"{cmd_name}成功，输出：{result.stdout.strip()}")
+                logger.info(f"{cmd_name}完成（耗时{elapsed}ms）")
+        except subprocess.TimeoutExpired:
+            elapsed = round((time.time() - start_time) * 1000, 2)
+            logger.error(f"{cmd_name}超时（30秒），耗时{elapsed}ms")
             return False
-    except subprocess.TimeoutExpired:
-        elapsed = round((time.time() - start_time) * 1000, 2)
-        logger.error(f"Git拉取超时（30秒），耗时{elapsed}ms，目录：{PRIVATE_CSV_REPO_ROOT}")
-        return False
-    except Exception as e:
-        elapsed = round((time.time() - start_time) * 1000, 2)
-        logger.error(f"拉取私有CSV仓库异常（耗时{elapsed}ms）：{str(e)}", exc_info=True)
-        return False
+        except Exception as e:
+            elapsed = round((time.time() - start_time) * 1000, 2)
+            logger.error(f"{cmd_name}异常（耗时{elapsed}ms）：{str(e)}", exc_info=True)
+            return False
+    
+    # 最终验证同步结果
+    total_elapsed = round((time.time() - start_time) * 1000, 2)
+    logger.warning("⚠️  已强制覆盖本地CSV仓库为远程main分支版本（本地未提交修改已删除）")
+    logger.info(f"私有CSV仓库强制同步成功（总耗时{total_elapsed}ms），分支：{CSV_REPO_BRANCH}，目录：{PRIVATE_CSV_REPO_ROOT}")
+    return True
 
 def copy_csv_to_main_repo():
     """复制CSV（引用配置文件的路径/文件列表）"""
@@ -132,11 +142,10 @@ def copy_csv_to_main_repo():
     if old_files:
         logger.info(f"清理主仓库旧CSV文件：{old_files}")
         for f in old_files:
-            os.remove(os.path.join(CSV_TARGET_DIR, f))  # 兼容Path对象，改用os.path.join
+            os.remove(os.path.join(CSV_TARGET_DIR, f))
     
-    # 复制新CSV并记录细节（引用配置的文件列表）
+    # 复制新CSV并记录细节
     for csv_file in REQUIRED_CSV_FILES:
-        # 核心：明确拼接源文件路径，避免Path对象解析错误
         source_path = os.path.join(str(CSV_SOURCE_DIR), csv_file)
         target_path = os.path.join(str(CSV_TARGET_DIR), csv_file)
         logger.debug(f"处理文件：源路径={source_path}，目标路径={target_path}")
@@ -181,13 +190,13 @@ def main():
     logger.info("===== 主仓库CSV同步流程启动 ======")
     start_total = time.time()
     
-    # 1. 拉取私有仓库（修复后：强制在/opt/csv_repo执行）
+    # 1. 强制同步私有仓库（解决不同步问题）
     pull_ok = pull_private_csv_repo()
     if not pull_ok:
-        logger.error("私有仓库拉取失败，同步流程终止")
+        logger.error("私有仓库同步失败，同步流程终止")
         sys.exit(1)
     
-    # 2. 复制CSV到主仓库（从/opt/csv_repo/result复制）
+    # 2. 复制CSV到主仓库
     copy_ok = copy_csv_to_main_repo()
     
     # 3. 总耗时汇总
