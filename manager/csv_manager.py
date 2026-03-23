@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 CSV文件管理模块（极简版：复用sync_csv_from_remote.py核心逻辑）
-新增：split_csv 函数 → 调用extract_song_data.py生成标准化CSV表
+新增：
+1. split_csv → 调用extract_song_data.py生成标准化CSV表
+2. clean_csv → 清理本地data_csv目录下的CSV文件
 """
 import os
 import sys
@@ -15,7 +17,7 @@ MAIN_REPO_ROOT = Path(__file__).parent.parent  # /opt/main_project
 sys.path.insert(0, str(MAIN_REPO_ROOT / "scripts"))  # 加入scripts目录到Python路径
 sys.path.insert(0, str(MAIN_REPO_ROOT))
 
-# 1. 导入统一颜色配置
+# 1. 导入统一颜色配置和路径
 from config.settings import COLORS, CSV_TARGET_DIR
 # 2. 直接导入sync_csv_from_remote.py的核心函数（关键：复用所有逻辑）
 import sync_csv_from_remote as csv_sync
@@ -47,7 +49,7 @@ def sync_now():
         sys.exit(1)
 
 def clean_remote_csv():
-    """清理远程CSV文件（sync_csv_from_remote中无此功能，保留独立实现）"""
+    """清理远程CSV文件（CSV_SOURCE_DIR）"""
     print_color("===== 开始清理远程CSV文件 =====", "YELLOW")
     from config.settings import CSV_SOURCE_DIR
     
@@ -58,10 +60,10 @@ def clean_remote_csv():
     # 查找并确认删除CSV文件
     csv_files = [f for f in os.listdir(CSV_SOURCE_DIR) if f.endswith(".csv")]
     if not csv_files:
-        print_color("ℹ️  无CSV文件需要清理", "YELLOW")
+        print_color("ℹ️  无远程CSV文件需要清理", "YELLOW")
         return
     
-    print_color(f"即将删除以下文件：{csv_files}", "YELLOW")
+    print_color(f"即将删除远程目录[{CSV_SOURCE_DIR}]下的文件：{csv_files}", "YELLOW")
     if input(COLORS["YELLOW"] + "输入 YES 确认删除：" + COLORS["NC"]) != "YES":
         print_color("ℹ️  用户取消操作", "YELLOW")
         return
@@ -75,8 +77,51 @@ def clean_remote_csv():
         print_color(f"❌ 删除失败：{str(e)}", "RED")
         sys.exit(1)
 
+def clean_csv():
+    """新增：清理本地data_csv目录（CSV_TARGET_DIR）下的所有CSV文件"""
+    print_color("===== 开始清理本地CSV文件 =====", "YELLOW")
+    start_time = time.time()
+    
+    # 1. 检查本地目录是否存在
+    if not os.path.exists(CSV_TARGET_DIR):
+        print_color(f"❌ 本地CSV目录不存在：{CSV_TARGET_DIR}", "RED")
+        sys.exit(1)
+    
+    # 2. 筛选出所有CSV文件（排除非CSV）
+    csv_files = [f for f in os.listdir(CSV_TARGET_DIR) if f.endswith(".csv")]
+    if not csv_files:
+        print_color("ℹ️  本地CSV目录无CSV文件需要清理", "YELLOW")
+        total_time = round((time.time() - start_time) * 1000, 2)
+        print_color(f"✅ clean_csv执行完成（总耗时{total_time}ms）", "GREEN")
+        return
+    
+    # 3. 交互式确认删除
+    print_color(f"即将删除本地目录[{CSV_TARGET_DIR}]下的文件：{csv_files}", "YELLOW")
+    user_confirm = input(COLORS["YELLOW"] + "输入 YES 确认删除（高危操作）：" + COLORS["NC"]).strip()
+    if user_confirm != "YES":
+        print_color("ℹ️  用户取消清理本地CSV文件操作", "YELLOW")
+        total_time = round((time.time() - start_time) * 1000, 2)
+        print_color(f"✅ clean_csv执行完成（总耗时{total_time}ms）", "GREEN")
+        return
+    
+    # 4. 执行删除操作
+    try:
+        deleted_count = 0
+        for f in csv_files:
+            file_path = os.path.join(CSV_TARGET_DIR, f)
+            os.remove(file_path)
+            deleted_count += 1
+            print_color(f"🗑️  已删除：{f}", "YELLOW")
+        
+        total_time = round((time.time() - start_time) * 1000, 2)
+        print_color(f"✅ 成功删除{deleted_count}个本地CSV文件（总耗时{total_time}ms）", "GREEN")
+    except Exception as e:
+        total_time = round((time.time() - start_time) * 1000, 2)
+        print_color(f"❌ 清理本地CSV文件失败（总耗时{total_time}ms）：{str(e)}", "RED")
+        sys.exit(1)
+
 def split_csv():
-    """新增：调用extract_song_data.py，拆分原始CSV为多张标准化表"""
+    """调用extract_song_data.py，拆分原始CSV为多张标准化表"""
     print_color("===== 开始执行split_csv：生成标准化CSV表 =====", "YELLOW")
     start_time = time.time()
     
@@ -121,10 +166,11 @@ if __name__ == "__main__":
         command_map = {
             "sync-now": sync_now,
             "clean-remote-csv": clean_remote_csv,
-            "split_csv": split_csv  # 新增测试入口
+            "clean-csv": clean_csv,  # 新增本地清理指令
+            "split_csv": split_csv
         }
         cmd = sys.argv[1]
         if cmd in command_map:
             command_map[cmd]()
         else:
-            print_color("未知命令：仅支持 sync-now / clean-remote-csv / split_csv", "RED")
+            print_color("未知命令：仅支持 sync-now / clean-remote-csv / clean-csv / split_csv", "RED")

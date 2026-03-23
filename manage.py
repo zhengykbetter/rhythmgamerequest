@@ -7,6 +7,7 @@
 新增指令：
 - split_csv：调用csv_manager.split_csv生成标准化CSV表
 - auto-update：自动询问执行sync-now、split_csv（支持拓展）
+- clean-csv：清理本地data_csv目录下的CSV文件
 """
 import os
 import sys
@@ -20,7 +21,8 @@ sys.path.insert(0, str(MAIN_REPO_ROOT))  # 加入Python路径
 # 导入配置和子模块
 from config.settings import COLORS, CSV_TARGET_DIR
 from manager import cron_manager
-from manager.csv_manager import sync_now, clean_remote_csv, split_csv  # 导入csv_manager的所有函数
+# 导入csv_manager的所有函数（含新增的clean_csv）
+from manager.csv_manager import sync_now, clean_remote_csv, clean_csv, split_csv
 
 # ========== 通用工具函数 ==========
 def print_color(msg: str, color: str = "NC") -> None:
@@ -62,12 +64,13 @@ def starter():
 
 # ========== 自动更新流程函数 ==========
 def auto_update():
-    """自动更新流程：询问是否执行sync-now、split_csv（支持拓展）"""
+    """自动更新流程：询问是否执行sync-now、clean-csv、split_csv（支持拓展）"""
     print_color("===== 执行auto-update指令：自动更新流程 =====", "YELLOW")
     
-    # 定义自动更新的指令列表（支持后续拓展）
+    # 定义自动更新的指令列表（支持后续拓展，新增clean-csv可选步骤）
     update_steps = [
         ("sync-now", "同步远程CSV文件到本地", sync_now),
+        ("clean-csv", "清理本地旧CSV文件", clean_csv),
         ("split_csv", "拆分原始CSV为标准化表", split_csv)
     ]
     
@@ -86,12 +89,12 @@ def auto_update():
     print_color("\n🎉 auto-update自动更新流程结束！", "GREEN")
 
 def show_help():
-    """展示帮助信息（包含新增指令）"""
+    """展示帮助信息（包含新增的clean-csv指令）"""
     print_color("\n===== 管理员模式 - 指令列表 =====\n", "YELLOW")
     # 按类别分组展示指令
     base_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if k in ["starter", "help", "exit", "quit", "q"]]
     cron_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if "cron" in k]
-    csv_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if k in ["sync-now", "clean-remote-csv", "split_csv", "auto-update"]]
+    csv_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if k in ["sync-now", "clean-remote-csv", "clean-csv", "split_csv", "auto-update"]]
     
     print_color("【基础指令】", "GREEN")
     for cmd, desc in base_cmds:
@@ -107,7 +110,7 @@ def show_help():
     
     print_color("\n注：输入 exit/quit/q 可退出管理员模式\n", "YELLOW")
 
-# ========== 核心命令映射（调用csv_manager的split_csv） ==========
+# ========== 核心命令映射（集成clean-csv） ==========
 COMMAND_MAP = {
     # 基础指令
     "starter": ("初始化脚本权限", starter),
@@ -121,10 +124,11 @@ COMMAND_MAP = {
     "cancel-cron": ("取消本项目定时任务", cron_manager.cancel_cron),
     "clear-all-cron": ("删除所有定时任务（高危）", cron_manager.clear_all_cron),
     # CSV相关指令（调用csv_manager的函数）
-    "sync-now": ("同步远程CSV文件", sync_now),
+    "sync-now": ("同步远程CSV文件到本地", sync_now),
     "clean-remote-csv": ("清理远程CSV文件", clean_remote_csv),
+    "clean-csv": ("清理本地data_csv目录下的CSV文件", clean_csv),  # 新增本地清理指令
     "split_csv": ("拆分原始CSV为标准化表", split_csv),
-    "auto-update": ("自动更新流程（sync-now + split_csv）", auto_update)
+    "auto-update": ("自动更新流程（sync-now + clean-csv + split_csv）", auto_update)
 }
 
 # ========== 交互式管理员模式 ==========
