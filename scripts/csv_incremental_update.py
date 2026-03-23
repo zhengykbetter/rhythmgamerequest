@@ -21,19 +21,6 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
-# ===================== 新增：定义CSV路径字典（关键！解决OUTPUT_PATHS未定义） =====================
-# 替换为你实际的CSV文件存储路径（不是archive归档路径，是原始CSV所在路径）
-CSV_BASE_PATH = "/opt/main_project/data_csv"  # 你的CSV根目录
-OUTPUT_PATHS = {
-    "game_info": os.path.join(CSV_BASE_PATH, "game_info.csv"),
-    "author_info": os.path.join(CSV_BASE_PATH, "author_info.csv"),
-    "song_info": os.path.join(CSV_BASE_PATH, "song_info.csv"),
-    "game_song_rel": os.path.join(CSV_BASE_PATH, "game_song_rel.csv"),
-    "song_author_rel": os.path.join(CSV_BASE_PATH, "song_author_rel.csv"),
-    "game_linkage_rel": os.path.join(CSV_BASE_PATH, "game_linkage_rel.csv")
-}
-
-
 # ===================== 路径配置 =====================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -305,66 +292,61 @@ def generate_create_table_sql(table_name):
     return create_sql
 
 def init_table(table_name):
-    """初始化单表（新增：按field_types创建，按create_order排序）"""
-    # 1. 获取表规则
-    rule = TABLE_RULES[table_name]
-    # 2. 读取CSV获取字段列表（补充容错：CSV不存在则用field_types的字段）
-    csv_path = OUTPUT_PATHS[table_name]
-    try:
-        df = pd.read_csv(csv_path, encoding="utf-8")
-        fields = df.columns.tolist()  # 从CSV读取字段
-    except FileNotFoundError:
-        # CSV不存在时，从field_types提取字段（排除自动字段，后续补充）
-        fields = list(rule.get("field_types", {}).keys())
-        print(f"⚠️  {table_name}的CSV文件不存在，使用field_types定义的字段")
+    """初始化单表（完全基于TABLE_RULES，不依赖CSV/OUTPUT_PATHS）"""
+    # 1. 获取当前表的规则配置
+    table_rule = TABLE_RULES[table_name]
     
-    # 补充自动字段（最新更新时间、update_timestamp）
-    fields = list(set(fields + rule["auto_cols"]))  # 去重
+    # 2. 从field_types提取字段列表（核心：不再读CSV，直接用显式定义的字段）
+    fields = list(table_rule["field_types"].keys())
     
-    # 3. 构建建表SQL（使用field_types指定类型）
-    field_sql = []
+    # 3. 构建建表SQL的字段部分（显式指定类型，解决推断错误）
+    field_sql_list = []
     for field in fields:
-        # 优先使用显式指定的类型，否则默认VARCHAR(255)
-        field_type = rule.get("field_types", {}).get(field, "VARCHAR(255)")
+        # 获取显式定义的字段类型（如VARCHAR(50)、DATE）
+        field_type = table_rule["field_types"][field]
+        
         # 主键处理
-        if field == rule["primary_key"]:
-            field_sql.append(f"`{field}` {field_type} NOT NULL PRIMARY KEY COMMENT '主键'")
-        # 自动时间戳处理
+        if field == table_rule["primary_key"]:
+            field_sql = f"`{field}` {field_type} NOT NULL PRIMARY KEY COMMENT '主键'"
+        # 自动时间戳字段特殊处理（update_timestamp）
         elif field == "update_timestamp":
-            field_sql.append(f"`{field}` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '系统更新时间戳'")
+            field_sql = f"`{field}` {field_type} DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '系统更新时间戳'"
+        # 普通字段
         else:
-            field_sql.append(f"`{field}` {field_type} COMMENT '{field}'")
+            field_sql = f"`{field}` {field_type} COMMENT '{field}'"
+        
+        field_sql_list.append(field_sql)
     
-    # 4. 拼接外键（去重+避免重复添加）
-    foreign_keys = []
-    for fk in rule["foreign_keys"]:
-        if fk not in field_sql:
-            foreign_keys.append(fk)
-    if foreign_keys:
-        field_sql.append(", ".join(foreign_keys))
+    # 4. 拼接外键（修正写法：中文字段加反引号，解决外键报错）
+    if table_rule["foreign_keys"]:
+        foreign_keys_sql = ", ".join(table_rule["foreign_keys"])
+        field_sql_list.append(foreign_keys_sql)
     
-    # 5. 完整建表SQL
-    create_sql = f"""
+    # 5. 组装完整建表SQL
+    create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
-            {', '.join(field_sql)}
+            {', '.join(field_sql_list)}
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='{table_name}（自动生成）';
     """
     
-    # 执行建表
+    # 6. 执行建表
     try:
+        from sqlalchemy import create_engine, text
         engine = create_engine(MYSQL_CONFIG)
         with engine.connect() as conn:
-            conn.execute(text(create_sql))
+            conn.execute(text(create_table_sql))
             conn.commit()
-        print(f"✅ 成功初始化表 {table_name}（自动生成表结构）")
+        print(f"✅ 成功初始化表 {table_name}")
     except Exception as e:
-        print(f"⚠️  初始化表 {table_name} 失败：{e}")
+        print(f"⚠️  初始化表 {table_name} 失败：{str(e)}")
 
-# 批量初始化表（按create_order顺序）
 def init_all_tables():
+    """按指定顺序初始化所有表（解决外键依赖）"""
+    # 从TABLE_RULES获取建表顺序（基础表在前，关联表在后）
     create_order = TABLE_RULES["create_order"]
     for table_name in create_order:
         init_table(table_name)
+
 # ===================== CSV处理通用函数（无修改） =====================
 def archive_csv(table_name, csv_path):
     if not csv_path or not os.path.exists(csv_path):
