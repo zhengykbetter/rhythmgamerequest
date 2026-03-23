@@ -17,8 +17,11 @@ CRON_BACKUP_DIR = LOG_DIR
 CSV_ROOT_DIR = os.path.join(BASE_DIR, "data", "csv")
 os.makedirs(CSV_ROOT_DIR, exist_ok=True)
 
-# 补充缺失的CSV_SOURCE_DIR（解决sync_csv_from_remote.py导入报错）
-CSV_SOURCE_DIR = os.path.join(CSV_ROOT_DIR, "source")  # 远程CSV下载目录
+# 👇 新增：解决CSV_TARGET_DIR导入错误（映射到CSV_ROOT_DIR，兼容sync_csv_from_remote.py）
+CSV_TARGET_DIR = CSV_ROOT_DIR  
+
+# 补充缺失的CSV_SOURCE_DIR
+CSV_SOURCE_DIR = os.path.join(CSV_ROOT_DIR, "source")
 os.makedirs(CSV_SOURCE_DIR, exist_ok=True)
 
 # 源文件路径
