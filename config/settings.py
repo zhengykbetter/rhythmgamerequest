@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-# ===================== 基础路径配置（核心） =====================
+# ===================== 基础核心配置 =====================
 BASE_DIR = Path(__file__).resolve().parent.parent  # 项目根目录
 MAIN_REPO_ROOT = str(BASE_DIR)
 PYTHON_EXEC_PATH = "python3"  # Python执行路径
@@ -11,7 +11,7 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 CRON_BACKUP_DIR = LOG_DIR  # Cron备份目录
 
-# ===================== CSV全量配置（包含所有子脚本需要的变量） =====================
+# ===================== CSV 全量配置（覆盖所有子脚本需求） =====================
 # 核心目录
 CSV_ROOT_DIR = os.path.join(BASE_DIR, "data", "csv")          # CSV根目录
 CSV_TARGET_DIR = CSV_ROOT_DIR                                # 兼容sync_csv_from_remote.py的CSV_TARGET_DIR
@@ -21,7 +21,7 @@ os.makedirs(CSV_ROOT_DIR, exist_ok=True)
 os.makedirs(CSV_SOURCE_DIR, exist_ok=True)
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
-# 同步远程CSV需要的文件列表（解决REQUIRED_CSV_FILES缺失）
+# 远程CSV同步 - 文件列表（解决REQUIRED_CSV_FILES缺失）
 REQUIRED_CSV_FILES = [
     "game_info_raw.csv",
     "song_info_raw.csv",
@@ -30,6 +30,13 @@ REQUIRED_CSV_FILES = [
     "song_author_rel_raw.csv",
     "game_linkage_rel_raw.csv"
 ]
+
+
+CSV_REPO_URL = "https://github.com/zhengykbetter/rhythmgamebase.git"  
+CSV_REPO_BRANCH = "main"                                     # 仓库分支（保持main即可，可根据实际分支修改）
+CSV_REPO_LOCAL_PATH = os.path.join(BASE_DIR, "data", "csv-repo")  # 仓库本地克隆路径
+os.makedirs(CSV_REPO_LOCAL_PATH, exist_ok=True)
+
 
 # 源文件路径（原始CSV）
 RAW_FILES = {
@@ -70,13 +77,6 @@ DB_CONFIG = {
     "database": os.getenv("DB_NAME", "rhythmgame"),
     "charset": "utf8mb4",
     "connect_timeout": 10  # 数据库连接超时
-}
-
-# ===================== 远程CSV同步配置（可选，供sync_csv_from_remote.py使用） =====================
-REMOTE_CSV_CONFIG = {
-    "remote_url_prefix": "https://example.com/csv/",  # 远程CSV前缀（根据实际修改）
-    "download_timeout": 30,                           # 下载超时时间
-    "verify_ssl": False                                # 是否验证SSL
 }
 
 # ===================== Cron定时任务配置 =====================
