@@ -18,30 +18,12 @@ sys.path.insert(0, str(MAIN_REPO_ROOT))  # 加入主目录到Python路径
 from config.settings import COLORS
 from manager import cron_manager, csv_manager
 
-# ========== 通用工具函数 ==========
+# ========== 通用工具函数（最先定义） ==========
 def print_color(msg: str, color: str = "NC") -> None:
     """带颜色打印（引用settings统一颜色）"""
     print(f"{COLORS.get(color, COLORS['NC'])}{msg}{COLORS['NC']}")
 
-# ========== 核心命令映射（统一管理所有指令） ==========
-COMMAND_MAP = {
-    # 基础指令
-    "starter": ("初始化脚本权限", starter),
-    "help": ("查看帮助信息", show_help),
-    "exit": ("退出管理员模式", None),
-    "quit": ("退出管理员模式", None),
-    "q": ("退出管理员模式", None),
-    # Cron相关指令
-    "set-cron": ("配置定时任务", cron_manager.set_cron),
-    "check-cron": ("检查定时任务", cron_manager.check_cron),
-    "cancel-cron": ("取消本项目定时任务", cron_manager.cancel_cron),
-    "clear-all-cron": ("删除所有定时任务（高危）", cron_manager.clear_all_cron),
-    # CSV相关指令
-    "sync-now": ("同步CSV文件", csv_manager.sync_now),
-    "clean-remote-csv": ("清理远程CSV文件", csv_manager.clean_remote_csv)
-}
-
-# ========== 初始化函数 ==========
+# ========== 核心功能函数（先定义，后引用） ==========
 def starter():
     """初始化：给脚本加执行权限 + 创建日志目录"""
     print_color("===== 开始初始化脚本执行权限 =====", "YELLOW")
@@ -63,7 +45,6 @@ def starter():
     print_color(f"✅ 已创建日志目录：{LOG_DIR}", "GREEN")
     print_color("===== 脚本权限初始化完成 =====", "GREEN")
 
-# ========== 帮助函数（适配交互式模式） ==========
 def show_help():
     """展示帮助信息（支持交互式/命令行模式）"""
     print_color("\n===== 管理员模式 - 指令列表 =====\n", "YELLOW")
@@ -85,6 +66,24 @@ def show_help():
         print(f"  {cmd:<15} - {desc}")
     
     print_color("\n注：输入 exit/quit/q 可退出管理员模式\n", "YELLOW")
+
+# ========== 核心命令映射（最后定义，确保所有函数已定义） ==========
+COMMAND_MAP = {
+    # 基础指令
+    "starter": ("初始化脚本权限", starter),
+    "help": ("查看帮助信息", show_help),
+    "exit": ("退出管理员模式", None),
+    "quit": ("退出管理员模式", None),
+    "q": ("退出管理员模式", None),
+    # Cron相关指令
+    "set-cron": ("配置定时任务", cron_manager.set_cron),
+    "check-cron": ("检查定时任务", cron_manager.check_cron),
+    "cancel-cron": ("取消本项目定时任务", cron_manager.cancel_cron),
+    "clear-all-cron": ("删除所有定时任务（高危）", cron_manager.clear_all_cron),
+    # CSV相关指令
+    "sync-now": ("同步CSV文件", csv_manager.sync_now),
+    "clean-remote-csv": ("清理远程CSV文件", csv_manager.clean_remote_csv)
+}
 
 # ========== 交互式管理员模式 ==========
 def interactive_mode():
