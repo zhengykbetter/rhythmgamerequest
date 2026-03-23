@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CSV管理子脚本：修复所有缺陷 + 兼容短横线指令 + 保留核心同步/清理逻辑
+CSV管理子脚本：修复所有缺陷 + 兼容短横线指令 + 保留核心同步/清理逻辑 + 新增Git同步功能
 """
 import os
 import sys
@@ -13,44 +13,153 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from pathlib import Path
 
+# 新增：Git仓库操作依赖
+try:
+    from git import Repo
+    from git.exc import GitCommandError, InvalidGitRepositoryError, NoSuchPathError
+except ImportError:
+    pass
+
 # 颜色常量
 RED = '\033[0;31m'
 GREEN = '\033[0;32m'
 YELLOW = '\033[1;33m'
 NC = '\033[0m'
 
-# ===================== 前置检查（新增） =====================
+# ===================== 前置检查（新增Git配置加载） =====================
 def pre_check():
     """检查依赖库和基础配置"""
-    # 检查pandas/sqlalchemy
+    # 检查基础依赖库
     try:
         import pandas as pd
         from sqlalchemy import create_engine
     except ImportError as e:
-        print(f"{RED}❌ 缺少依赖库：{e}，请执行 pip install pandas sqlalchemy pymysql{NC}", file=sys.stderr)
+        print(f"{RED}❌ 缺少基础依赖库：{e}，请执行 pip install pandas sqlalchemy pymysql{NC}", file=sys.stderr)
         sys.exit(1)
+    
+    # 检查Git依赖（sync-git指令需要）
+    if len(sys.argv) >= 2 and sys.argv[1] == "sync-git":
+        try:
+            from git import Repo
+        except ImportError:
+            print(f"{RED}❌ 缺少Git依赖库：gitpython，请执行 pip install gitpython{NC}", file=sys.stderr)
+            sys.exit(1)
     
     # 添加项目根目录到Python路径
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     
-    # 加载settings（替代外部传config，解决KeyError）
+    # 加载settings（新增Git相关配置）
     try:
         from config.settings import (
             CSV_ROOT_DIR, ARCHIVE_DIR, CLEAN_CONFIG,
-            DB_CONFIG, TARGET_FILES
+            DB_CONFIG, TARGET_FILES,
+            CSV_REPO_URL, CSV_REPO_BRANCH, CSV_REPO_LOCAL_PATH,
+            PRIVATE_CSV_REPO_ROOT, REQUIRED_CSV_FILES, CSV_SOURCE_DIR
         )
         return {
             "CSV_ROOT_DIR": CSV_ROOT_DIR,
             "ARCHIVE_DIR": ARCHIVE_DIR,
             "CLEAN_CONFIG": CLEAN_CONFIG,
             "DB_CONFIG": DB_CONFIG,
-            "TARGET_FILES": TARGET_FILES
+            "TARGET_FILES": TARGET_FILES,
+            # Git同步相关配置
+            "CSV_REPO_URL": CSV_REPO_URL,
+            "CSV_REPO_BRANCH": CSV_REPO_BRANCH,
+            "CSV_REPO_LOCAL_PATH": CSV_REPO_LOCAL_PATH,
+            "PRIVATE_CSV_REPO_ROOT": PRIVATE_CSV_REPO_ROOT,
+            "REQUIRED_CSV_FILES": REQUIRED_CSV_FILES,
+            "CSV_SOURCE_DIR": CSV_SOURCE_DIR
         }
     except ImportError as e:
         print(f"{RED}❌ 读取settings.py失败：{e}{NC}", file=sys.stderr)
         sys.exit(1)
 
-# ===================== 清理旧文件（修复逻辑错误） =====================
+# ===================== Git同步（新增核心功能） =====================
+def sync_git(config):
+    """
+    同步GitHub仓库：
+    1. 克隆/拉取仓库到/opt/csv_repo
+    2. 拷贝result目录下的文件到项目CSV_SOURCE_DIR
+    """
+    print(f"{YELLOW}===== 开始同步GitHub仓库 ====={NC}")
+    try:
+        # 1. 确保仓库本地目录存在且有权限
+        repo_path = Path(config["CSV_REPO_LOCAL_PATH"])
+        os.makedirs(repo_path, exist_ok=True)
+        if not os.access(repo_path, os.W_OK):
+            print(f"{RED}❌ 无写入权限：{repo_path}，请检查目录权限{NC}", file=sys.stderr)
+            return False
+        
+        # 2. 克隆/拉取GitHub仓库
+        try:
+            if repo_path.joinpath(".git").exists():
+                # 仓库已存在，拉取最新代码
+                repo = Repo(str(repo_path))
+                origin = repo.remote(name="origin")
+                # 拉取前先检查远程分支
+                origin.fetch()
+                origin.pull(config["CSV_REPO_BRANCH"])
+                print(f"{GREEN}✅ 成功拉取仓库最新代码：{config['CSV_REPO_URL']}（{config['CSV_REPO_BRANCH']}分支）{NC}")
+            else:
+                # 仓库不存在，克隆
+                Repo.clone_from(
+                    config["CSV_REPO_URL"],
+                    str(repo_path),
+                    branch=config["CSV_REPO_BRANCH"]
+                )
+                print(f"{GREEN}✅ 成功克隆仓库：{config['CSV_REPO_URL']} → {repo_path}{NC}")
+        except GitCommandError as e:
+            print(f"{RED}❌ Git命令执行失败：{str(e)}（请检查仓库地址/分支/网络）{NC}", file=sys.stderr)
+            return False
+        except InvalidGitRepositoryError as e:
+            print(f"{RED}❌ 无效的Git仓库：{str(e)}{NC}", file=sys.stderr)
+            return False
+        except NoSuchPathError as e:
+            print(f"{RED}❌ 仓库路径不存在：{str(e)}{NC}", file=sys.stderr)
+            return False
+        
+        # 3. 定位仓库内的CSV目录（/opt/csv_repo/result）
+        repo_csv_dir = repo_path / config["PRIVATE_CSV_REPO_ROOT"]
+        if not repo_csv_dir.exists():
+            print(f"{RED}❌ 仓库内CSV目录不存在：{repo_csv_dir}{NC}", file=sys.stderr)
+            return False
+        
+        # 4. 拷贝指定文件到项目CSV_SOURCE_DIR
+        os.makedirs(config["CSV_SOURCE_DIR"], exist_ok=True)
+        success_count = 0
+        fail_count = 0
+        
+        for csv_file in config["REQUIRED_CSV_FILES"]:
+            # 仓库内的源文件路径
+            src_file = repo_csv_dir / csv_file
+            # 项目内的目标文件路径
+            dst_file = Path(config["CSV_SOURCE_DIR"]) / csv_file
+            
+            if not src_file.exists():
+                print(f"{YELLOW}ℹ️ 仓库内文件缺失：{src_file}，跳过{NC}")
+                fail_count += 1
+                continue
+            
+            try:
+                # 拷贝文件（覆盖已有文件）
+                shutil.copy2(str(src_file), str(dst_file))
+                print(f"{GREEN}✅ 拷贝成功：{src_file} → {dst_file}{NC}")
+                success_count += 1
+            except Exception as e:
+                print(f"{RED}❌ 拷贝失败：{csv_file}，原因：{str(e)}{NC}")
+                fail_count += 1
+        
+        # 5. 输出汇总
+        print(f"{GREEN}✅ Git同步汇总：成功{success_count}个，失败{fail_count}个{NC}")
+        if fail_count > 0 and success_count == 0:
+            return False
+        
+        return True
+    except Exception as e:
+        print(f"{RED}❌ Git同步整体失败：{str(e)}{NC}", file=sys.stderr)
+        return False
+
+# ===================== 清理旧文件（保留原有修复逻辑） =====================
 def clean_old_files(config):
     """清理旧文件（保留_raw源文件，修复归档后删除的bug）"""
     print(f"{YELLOW}===== 开始清理旧文件 ====={NC}")
@@ -99,7 +208,7 @@ def clean_old_files(config):
         print(f"{RED}❌ 清理旧文件失败：{str(e)}{NC}", file=sys.stderr)
         return False
 
-# ===================== 同步DB（增强鲁棒性） =====================
+# ===================== 同步DB（保留原有增强逻辑） =====================
 def sync_db(config):
     """同步CSV到数据库（新增异常处理、更新逻辑、编码兼容）"""
     print(f"{YELLOW}===== 开始同步CSV到DB ====={NC}")
@@ -242,14 +351,14 @@ def sync_db(config):
         print(f"{RED}❌ 同步DB失败：{str(e)}{NC}", file=sys.stderr)
         return False
 
-# ===================== 主入口（适配短横线指令） =====================
+# ===================== 主入口（新增sync-git指令） =====================
 def main():
-    """主入口：支持 clean-old/sync-db 短横线指令"""
+    """主入口：支持 clean-old/sync-db/sync-git 短横线指令"""
     # 前置检查 + 加载配置
     config = pre_check()
     
     if len(sys.argv) < 2:
-        print(f"{YELLOW}用法：python3 csv_manage.py [clean-old|sync-db]{NC}")
+        print(f"{YELLOW}用法：python3 csv_manage.py [clean-old|sync-db|sync-git]{NC}")
         sys.exit(1)
     
     cmd = sys.argv[1]
@@ -257,8 +366,10 @@ def main():
         success = clean_old_files(config)
     elif cmd == "sync-db":
         success = sync_db(config)
+    elif cmd == "sync-git":  # 新增Git同步指令
+        success = sync_git(config)
     else:
-        print(f"{RED}❌ 未知命令：{cmd}，支持命令：clean-old / sync-db{NC}")
+        print(f"{RED}❌ 未知命令：{cmd}，支持命令：clean-old / sync-db / sync-git{NC}")
         sys.exit(1)
     
     sys.exit(0 if success else 1)

@@ -15,11 +15,11 @@ LOG_ENCODING = "utf-8"             # 日志文件编码
 os.makedirs(LOG_DIR, exist_ok=True)# 自动创建日志目录
 CRON_BACKUP_DIR = str(LOG_DIR)     # 兼容字符串路径的逻辑
 
-# ===================== CSV 全量配置（2026-03-23 增量更新：修正文件流转逻辑） =====================
+# ===================== CSV 全量配置（2026-03-23 增量更新：匹配实际目录+GitHub逻辑） =====================
 # 1. 核心目录（区分「原始同步文件」和「提取生成文件」）
-CSV_ROOT_DIR = Path(BASE_DIR) / "data" / "csv"          # 最终生成文件目录（供数据库导入）
+CSV_ROOT_DIR = Path(BASE_DIR) / "data" / "csv"          # 项目的data_csv目录（目标目录）
 CSV_ROOT_DIR_STR = str(CSV_ROOT_DIR)                    # 兼容字符串版本
-CSV_SOURCE_DIR = CSV_ROOT_DIR / "source"                # 原始同步文件目录（仅存game_info.csv、songraw_info.csv）
+CSV_SOURCE_DIR = CSV_ROOT_DIR / "source"                # 同步后的原始文件存放目录
 CSV_SOURCE_DIR_STR = str(CSV_SOURCE_DIR)                # 兼容字符串版本
 CSV_TARGET_DIR = CSV_ROOT_DIR                            # 提取生成文件的目标目录
 CSV_TARGET_DIR_STR = str(CSV_TARGET_DIR)                # 兼容字符串版本
@@ -30,27 +30,29 @@ os.makedirs(CSV_ROOT_DIR, exist_ok=True)
 os.makedirs(CSV_SOURCE_DIR, exist_ok=True)
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
-# 2. 远程Git仓库配置（你的仓库+指定data_csv路径）
+# 2. 【关键修正】GitHub仓库抓取配置（匹配你的实际目录）
 CSV_REPO_URL = "https://github.com/zhengykbetter/rhythmgamebase.git"  # 你的仓库地址
 CSV_REPO_BRANCH = "main"                                             # 仓库分支
-CSV_REPO_LOCAL_PATH = Path(BASE_DIR) / "data" / "csv-repo"           # 本地克隆仓库路径
+CSV_REPO_LOCAL_PATH = Path("/opt/csv_repo")                          # 你指定的仓库本地抓取路径
 CSV_REPO_LOCAL_PATH_STR = str(CSV_REPO_LOCAL_PATH)                   # 兼容字符串版本
-PRIVATE_CSV_REPO_ROOT = "data_csv"                                   # 仓库内CSV文件的存放路径
+PRIVATE_CSV_REPO_ROOT = "result"                                     # CSV在仓库里的子目录（/opt/csv_repo/result）
+# 自动创建/opt/csv_repo目录（需确保当前用户有/opt目录的读写权限）
 os.makedirs(CSV_REPO_LOCAL_PATH, exist_ok=True)
 
-# 3. 【关键修正】仅同步Git仓库里的原始文件（game_info.csv、songraw_info.csv）
+# 3. 【关键修正】匹配/opt/csv_repo/result下的实际文件
+# 备注：song_info.csv是老版本，songraw_info.csv待仓库更新后替换
 REQUIRED_CSV_FILES = [
     "game_info.csv",
-    "songraw_info.csv"
+    "song_info.csv"
 ]
 
-# 4. 原始同步文件路径（仅指向Git同步来的文件）
+# 4. 原始同步文件路径（指向/opt/csv_repo/result同步来的文件）
 RAW_SOURCE_FILES = {
     "game_info": os.path.join(CSV_SOURCE_DIR_STR, "game_info.csv"),
-    "songraw_info": os.path.join(CSV_SOURCE_DIR_STR, "songraw_info.csv")
+    "song_info": os.path.join(CSV_SOURCE_DIR_STR, "song_info.csv")  # 老版本，待替换为songraw_info.csv
 }
 
-# 5. 【新增】extract_song_data.py生成的目标文件列表（供数据库导入）
+# 5. extract_song_data.py生成的目标文件列表（供数据库导入）
 EXTRACT_GENERATED_FILES = {
     "author_info": os.path.join(CSV_ROOT_DIR_STR, "author_info.csv"),
     "game_song_rel": os.path.join(CSV_ROOT_DIR_STR, "game_song_rel.csv"),
@@ -58,7 +60,7 @@ EXTRACT_GENERATED_FILES = {
     "game_linkage_rel": os.path.join(CSV_ROOT_DIR_STR, "game_linkage_rel.csv"),
     # 保留原始同步文件的映射（供extract读取）
     "game_info": os.path.join(CSV_ROOT_DIR_STR, "game_info.csv"),
-    "songraw_info": os.path.join(CSV_ROOT_DIR_STR, "songraw_info.csv")
+    "song_info": os.path.join(CSV_ROOT_DIR_STR, "song_info.csv")  # 老版本，待替换
 }
 
 # 6. 数据库导入用的目标文件（指向extract生成的文件）
@@ -101,4 +103,7 @@ CSV_MANAGE_SCRIPT = os.path.join(BASE_DIR, "managers", "csv_manage.py")         
 # ===================== 兜底配置 =====================
 SYNC_TIMEOUT = 60  # 同步超时
 SYNC_RETRY_TIMES = 3  # 同步重试
-EXTRACT_TIMEOUT = 120  # 新增：extract解析超时（2分钟）
+EXTRACT_TIMEOUT = 120  # extract解析超时（2分钟）
+# 新增：Git拉取配置（确保仓库权限）
+GIT_PULL_RETRY = 2  # Git拉取失败重试次数
+GIT_SSH_KEY_PATH = os.getenv("GIT_SSH_KEY_PATH", "")  # 私有仓库时配置SSH密钥路径
