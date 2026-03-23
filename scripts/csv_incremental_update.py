@@ -43,42 +43,86 @@ CSV_PATHS = {
 
 # 2. 核心业务规则（主键、自动字段、外键、日期字段规则）
 TABLE_RULES = {
-    # 基础表
-    "game_info": {"primary_key": "游戏编号", "auto_cols": ["最新更新时间", "update_timestamp"], 
-                  "date_cols": ["实装时间", "更新时间", "数据时间", "开服时间"], 
-                  "varchar_length": {"游戏": 200, "别名": 200},
-                  "foreign_keys": []},
-    
-    "song_info": {"primary_key": "song_id", "auto_cols": ["update_timestamp"], 
-                  "date_cols": ["歌曲更新时间"], 
-                  "varchar_length": {"歌名": 500, "别名": 500},
-                  "foreign_keys": []},
-    
-    "author_info": {"primary_key": "author_id", "auto_cols": ["update_timestamp"], 
-                    "date_cols": [], 
-                    "varchar_length": {"作者本名": 200, "作者别称": 500, "擅长风格": 200, "备注": 500},
-                    "foreign_keys": []},
+    # 作者信息表 - 匹配CSV：author_id,作者本名,作者别称,擅长风格,备注,最新更新时间
+    "author_info": {
+        "primary_key": "author_id",
+        "auto_cols": ["最新更新时间", "update_timestamp"],  # 包含CSV的最新更新时间+数据库自动字段
+        "date_cols": [],  # 无日期字段
+        "varchar_length": {
+            "author_id": 50,        # A001类短标识
+            "作者本名": 300,        # 适配['庭師','Aoi']这类数组字符串
+            "作者别称": 500,        # 预留多别称空间
+            "擅长风格": 200,
+            "备注": 500
+        },
+        "foreign_keys": []
+    },
 
-    # 关联表
-    "game_song_rel": {"primary_key": "rel_id", "auto_cols": ["update_timestamp"], 
-                      "date_cols": ["收录时间"], 
-                      "varchar_length": {"收录版本": 50},
-                      "foreign_keys": ["FOREIGN KEY (游戏编号) REFERENCES game_info(游戏编号) ON DELETE CASCADE"]},
-    
-    "song_author_rel": {"primary_key": "rel_id", "auto_cols": ["update_timestamp"], 
-                        "date_cols": [], 
-                        "varchar_length": {"合作类型": 50, "备注": 500},
-                        "foreign_keys": [
-                            "FOREIGN KEY (song_id) REFERENCES song_info(song_id) ON DELETE CASCADE",
-                            "FOREIGN KEY (author_id) REFERENCES author_info(author_id) ON DELETE CASCADE"
-                        ]},
-    
-    "game_linkage_rel": {"primary_key": "rel_id", "auto_cols": ["update_timestamp"], 
-                         "date_cols": ["联动时间"], 
-                         "varchar_length": {"游戏1名称": 100, "游戏2名称": 100, "联动名称": 200, "联动版本": 50, "说明": 500},
-                         "foreign_keys": []}
+    # 游戏联动表 - 匹配CSV：rel_id,游戏1编号,游戏2编号,游戏1名称,游戏2名称,联动名称,联动时间,联动版本,说明,最新更新时间
+    "game_linkage_rel": {
+        "primary_key": "rel_id",
+        "auto_cols": ["最新更新时间", "update_timestamp"],
+        "date_cols": ["联动时间"],  # CSV中的联动时间（DATE类型）
+        "varchar_length": {
+            "rel_id": 200,          # 适配Rotaeno_Rotaeno+Arcaea_20240829类长标识
+            "游戏1编号": 100,
+            "游戏2编号": 50,        # 多为0或短标识
+            "游戏1名称": 200,
+            "游戏2名称": 200,
+            "联动名称": 200,
+            "联动版本": 50,
+            "说明": 500
+        },
+        "foreign_keys": []
+    },
+
+    # 游戏-歌曲关联表 - 匹配CSV：rel_id,游戏编号,song_id,收录版本,收录时间,最新更新时间
+    "game_song_rel": {
+        "primary_key": "rel_id",
+        "auto_cols": ["最新更新时间", "update_timestamp"],
+        "date_cols": ["收录时间"],  # CSV中的收录时间（DATE类型）
+        "varchar_length": {
+            "rel_id": 200,          # 适配110001_Rotaeno_20240530类长标识
+            "游戏编号": 100,
+            "song_id": 50,          # 110001类数字字符串
+            "收录版本": 50
+        },
+        "foreign_keys": [
+            "FOREIGN KEY (游戏编号) REFERENCES game_info(游戏编号) ON DELETE CASCADE"
+        ]
+    },
+
+    # 歌曲信息表 - 匹配CSV：song_id,歌名,别名,歌曲更新时间,最新更新时间
+    "song_info": {
+        "primary_key": "song_id",
+        "auto_cols": ["最新更新时间", "update_timestamp"],
+        "date_cols": ["歌曲更新时间"],  # CSV中的歌曲更新时间（DATE类型）
+        "varchar_length": {
+            "song_id": 50,          # 110001类数字字符串
+            "歌名": 200,            # 翠杜类短文本
+            "别名": 200             # 脆肚类短文本
+        },
+        "foreign_keys": []
+    },
+
+    # 歌曲-作者关联表 - 匹配CSV：rel_id,song_id,author_id,合作类型,备注,最新更新时间
+    "song_author_rel": {
+        "primary_key": "rel_id",
+        "auto_cols": ["最新更新时间", "update_timestamp"],
+        "date_cols": [],  # 无日期字段
+        "varchar_length": {
+            "rel_id": 100,          # 适配110001_A001类短标识
+            "song_id": 50,
+            "author_id": 50,
+            "合作类型": 50,
+            "备注": 500
+        },
+        "foreign_keys": [
+            "FOREIGN KEY (song_id) REFERENCES song_info(song_id) ON DELETE CASCADE",
+            "FOREIGN KEY (author_id) REFERENCES author_info(author_id) ON DELETE CASCADE"
+        ]
+    }
 }
-
 # 3. 类型映射（Python类型 → MySQL类型）
 TYPE_MAPPING = {
     "int64": "INT",
