@@ -3,7 +3,7 @@
 """
 主项目管理入口（支持两种模式）：
 1. 命令行模式：./manage.py [指令]（如 ./manage.py set-cron）
-2. 交互式模式：./manage.py（无参数，进入管理员交互界面）
+2. 交互式模式：./manage.py（无参数，自动初始化+进入管理员交互界面）
 """
 import os
 import sys
@@ -43,7 +43,7 @@ def starter():
     from config.settings import LOG_DIR
     os.makedirs(LOG_DIR, exist_ok=True)
     print_color(f"✅ 已创建日志目录：{LOG_DIR}", "GREEN")
-    print_color("===== 脚本权限初始化完成 =====", "GREEN")
+    print_color("===== 脚本权限初始化完成 =====\n", "GREEN")
 
 def show_help():
     """展示帮助信息（支持交互式/命令行模式）"""
@@ -85,14 +85,23 @@ COMMAND_MAP = {
     "clean-remote-csv": ("清理远程CSV文件", csv_manager.clean_remote_csv)
 }
 
-# ========== 交互式管理员模式 ==========
+# ========== 交互式管理员模式（自动执行starter） ==========
 def interactive_mode():
-    """交互式管理员模式核心逻辑"""
+    """交互式管理员模式核心逻辑：自动初始化 + 指令交互"""
     # 欢迎语
     print_color("="*50, "YELLOW")
     print_color("欢迎进入项目管理员模式！", "GREEN")
-    print_color("输入 'help' 查看所有可用指令，输入 'exit/quit/q' 退出", "YELLOW")
     print_color("="*50, "YELLOW")
+    
+    # 核心修改：自动执行starter初始化
+    print_color("\n📌 正在自动执行脚本权限初始化（减少手动操作）...\n", "YELLOW")
+    try:
+        starter()  # 自动运行初始化函数
+    except Exception as e:
+        print_color(f"⚠️  自动初始化失败（可手动执行 starter 指令重试）：{str(e)}\n", "RED")
+    
+    # 提示使用说明
+    print_color("输入 'help' 查看所有可用指令，输入 'exit/quit/q' 退出\n", "YELLOW")
     
     # 循环接收指令
     while True:
