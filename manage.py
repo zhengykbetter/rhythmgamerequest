@@ -121,52 +121,61 @@ def starter(config):
     
     print(f"{GREEN}===== 权限初始化完成 ====={NC}")
 
+# 1. 修改 config_cron 函数
 def config_cron(config):
-    """配置Cron（逻辑不变）"""
+    """配置Cron（删除--config参数传递）"""
     starter(config)
     if not os.path.exists(config["CRON_MANAGE_SCRIPT"]):
         print(f"{RED}❌ cron_manage.py不存在：{config['CRON_MANAGE_SCRIPT']}{NC}")
         return False
+    # 关键修改：仅传递命令，不传递config字符串
     return run_shell_cmd(
-        f"{config['PYTHON_EXEC_PATH']} {config['CRON_MANAGE_SCRIPT']} config --config='{str(config)}'",
+        f"{config['PYTHON_EXEC_PATH']} {config['CRON_MANAGE_SCRIPT']} config",  # 移除 --config='{str(config)}'
         check=True
     )[2] == 0
 
+# 2. 修改 check_cron 函数
 def check_cron(config):
-    """检查Cron（逻辑不变）"""
+    """检查Cron（删除--config参数传递）"""
     if not os.path.exists(config["CRON_MANAGE_SCRIPT"]):
         print(f"{RED}❌ cron_manage.py不存在：{config['CRON_MANAGE_SCRIPT']}{NC}")
         return False
-    run_shell_cmd(f"{config['PYTHON_EXEC_PATH']} {config['CRON_MANAGE_SCRIPT']} check --config='{str(config)}'")
+    # 关键修改：仅传递命令，不传递config字符串
+    run_shell_cmd(f"{config['PYTHON_EXEC_PATH']} {config['CRON_MANAGE_SCRIPT']} check")  # 移除 --config='{str(config)}'
     return True
-
 def clear_all_cron(config):
-    """清除所有Cron（逻辑不变，仅保留警告）"""
+    """⚠️ 强制清除服务器上所有Cron任务（带警告+备份）⚠️"""
+    # 第一步：强制警告（醒目红色）
     print(f"{BOLD_RED}===== 危险操作警告 ====={NC}")
     print(f"{BOLD_RED}此命令将删除当前用户（{getpass.getuser()}）的所有Cron任务！{NC}")
+    print(f"{BOLD_RED}包括非本项目的所有定时任务，且无法恢复（除了备份）！{NC}")
+    print(f"{YELLOW}===== 备份提示 ====={NC}")
     backup_path = os.path.join(config["CRON_BACKUP_DIR"], f"cron_full_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-    print(f"即将备份所有Cron任务到：{backup_path}")
+    print(f"即将备份当前所有Cron任务到：{backup_path}")
     
+    # 第二步：用户确认（必须输入Y/y才执行）
     confirm = input(f"{BOLD_RED}请输入 'Y' 确认执行清除（输入其他则取消）：{NC}")
     if confirm.strip().upper() != "Y":
         print(f"{GREEN}✅ 用户取消操作，未清除任何Cron任务{NC}")
         return True
 
-    # 备份 + 清除
-    run_shell_cmd(f"crontab -l > {backup_path} 2>/dev/null")
+    # 第三步：备份所有Cron任务（微调：确保2>/dev/null屏蔽空crontab警告）
+    run_shell_cmd(f"crontab -l 2>/dev/null > {backup_path}", capture_output=True)
     print(f"{GREEN}✅ 已备份所有Cron任务到：{backup_path}{NC}")
-    
-    returncode = run_shell_cmd("crontab -r", capture_output=True)[2]
+
+    # 第四步：清除所有Cron（微调：简化命令，确保shell解析正确）
+    stdout, stderr, returncode = run_shell_cmd("crontab -r", capture_output=True)
     if returncode == 0:
         print(f"{GREEN}✅ 所有Cron任务已完全清除！{NC}")
-        cron_out = run_shell_cmd("crontab -l 2>/dev/null", capture_output=True)[0]
+        # 验证清除结果（屏蔽空crontab的警告）
+        cron_out, _, _ = run_shell_cmd("crontab -l 2>/dev/null", capture_output=True)
         if not cron_out:
             print(f"{GREEN}✅ 验证：当前无任何Cron任务{NC}")
         else:
             print(f"{YELLOW}ℹ️  验证异常：仍有Cron任务残留 → {cron_out}{NC}")
         return True
     else:
-        print(f"{RED}❌ 清除失败！错误：{run_shell_cmd('crontab -r', capture_output=True)[1]}{NC}")
+        print(f"{RED}❌ 清除失败！错误：{stderr}{NC}")
         return False
 
 # ===================== 其余函数（clean_old/extract/sync_db/auto_run/show_help/main）均保持不变 =====================
