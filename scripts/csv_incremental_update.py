@@ -23,16 +23,15 @@ from dotenv import load_dotenv
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # 主项目根目录（脚本目录的上一级，对应config目录的同级）
 MAIN_PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
-# 将主项目根目录加入Python路径，才能导入config.setting
+# 将主项目根目录加入Python路径，才能导入config.settings
 sys.path.insert(0, MAIN_PROJECT_ROOT)
 
 # ===================== 导入配置 =====================
 # 加载.env敏感配置
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))  # 明确指定.env路径
-# 导入公开配置（settings.py）
+# 导入公开配置（settings.py，修正文件名拼写+移除无效导入）
 from config.settings import (
     CSV_TARGET_DIR,  # game_info.csv所在目录
-    ARCHIVE_DIR as SETTING_ARCHIVE_DIR,  # 存档目录（若setting里有，否则用下面的）
     DB_CONFIG  # 数据库配置（从环境变量读取敏感信息）
 )
 
@@ -47,8 +46,8 @@ CSV_PATHS = {
     "game_linkage_rel": ""
 }
 
-# 2. CSV存档目录（优先用setting里的，没有则用默认）
-ARCHIVE_DIR = SETTING_ARCHIVE_DIR if 'SETTING_ARCHIVE_DIR' in locals() else str(CSV_TARGET_DIR / "archive")
+# 2. CSV存档目录（基于CSV目标目录自动拼接）
+ARCHIVE_DIR = str(CSV_TARGET_DIR / "archive")
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
 # 3. MySQL连接配置（从setting的DB_CONFIG整合，敏感信息来自.env）
