@@ -4,7 +4,7 @@
 主项目管理入口（仅做命令解析，核心逻辑拆分到manager目录）
 用法：
 ./manage.py starter          # 初始化脚本权限
-./manage.py config-cron     # 配置定时任务
+./manage.py set-cron        # 配置定时任务（原config-cron）
 ./manage.py check-cron      # 检查定时任务
 ./manage.py cancel-cron     # 取消本项目定时任务
 ./manage.py clear-all-cron  # 删除所有定时任务（高危）
@@ -51,7 +51,7 @@ def starter():
     print_color(f"✅ 已创建日志目录：{LOG_DIR}", "GREEN")
     print_color("===== 脚本权限初始化完成 =====", "GREEN")
 
-# ========== 帮助函数 ==========
+# ========== 帮助函数（更新改名后的命令） ==========
 def show_help():
     """展示帮助信息"""
     help_text = f"""
@@ -59,7 +59,7 @@ def show_help():
 用法：./manage.py [命令]
 命令列表：
   starter           - 初始化：给所有脚本赋予执行权限（首次部署必做）
-  config-cron       - 配置定时任务（从settings.py读取配置）
+  set-cron          - 配置定时任务（从settings.py读取配置）
   check-cron        - 检查当前定时任务配置
   cancel-cron       - 取消本项目的crontab任务（保留服务器其他任务）
   clear-all-cron    - {COLORS['BOLD_RED']}删除所有crontab任务（高危，带警告）{COLORS['NC']}
@@ -69,7 +69,7 @@ def show_help():
     """
     print(help_text.strip())
 
-# ========== 命令映射 & 主函数 ==========
+# ========== 命令映射 & 主函数（更新set-cron） ==========
 def main():
     if len(sys.argv) < 2:
         show_help()
@@ -78,7 +78,7 @@ def main():
     command = sys.argv[1]
     command_map = {
         "starter": starter,
-        "config-cron": cron_manager.config_cron,
+        "set-cron": cron_manager.set_cron,  # 改名：config-cron → set-cron
         "check-cron": cron_manager.check_cron,
         "cancel-cron": cron_manager.cancel_cron,
         "clear-all-cron": cron_manager.clear_all_cron,
