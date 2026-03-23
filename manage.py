@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-主项目管理入口（仅做命令解析，核心逻辑拆分到manager目录）
-用法：
-./manage.py starter          # 初始化脚本权限
-./manage.py set-cron        # 配置定时任务（原config-cron）
-./manage.py check-cron      # 检查定时任务
-./manage.py cancel-cron     # 取消本项目定时任务
-./manage.py clear-all-cron  # 删除所有定时任务（高危）
-./manage.py sync-now        # 同步CSV文件
-./manage.py clean-remote-csv # 清理远程CSV文件
-./manage.py help            # 查看帮助
+主项目管理入口（支持两种模式）：
+1. 命令行模式：./manage.py [指令]（如 ./manage.py set-cron）
+2. 交互式模式：./manage.py（无参数，进入管理员交互界面）
 """
 import os
 import sys
+import readline  # 优化输入体验（支持上下键历史记录）
 from pathlib import Path
 
 # ========== 基础配置 & 路径初始化 ==========
@@ -29,7 +23,25 @@ def print_color(msg: str, color: str = "NC") -> None:
     """带颜色打印（引用settings统一颜色）"""
     print(f"{COLORS.get(color, COLORS['NC'])}{msg}{COLORS['NC']}")
 
-# ========== 初始化函数（仅权限+日志目录） ==========
+# ========== 核心命令映射（统一管理所有指令） ==========
+COMMAND_MAP = {
+    # 基础指令
+    "starter": ("初始化脚本权限", starter),
+    "help": ("查看帮助信息", show_help),
+    "exit": ("退出管理员模式", None),
+    "quit": ("退出管理员模式", None),
+    "q": ("退出管理员模式", None),
+    # Cron相关指令
+    "set-cron": ("配置定时任务", cron_manager.set_cron),
+    "check-cron": ("检查定时任务", cron_manager.check_cron),
+    "cancel-cron": ("取消本项目定时任务", cron_manager.cancel_cron),
+    "clear-all-cron": ("删除所有定时任务（高危）", cron_manager.clear_all_cron),
+    # CSV相关指令
+    "sync-now": ("同步CSV文件", csv_manager.sync_now),
+    "clean-remote-csv": ("清理远程CSV文件", csv_manager.clean_remote_csv)
+}
+
+# ========== 初始化函数 ==========
 def starter():
     """初始化：给脚本加执行权限 + 创建日志目录"""
     print_color("===== 开始初始化脚本执行权限 =====", "YELLOW")
@@ -51,52 +63,102 @@ def starter():
     print_color(f"✅ 已创建日志目录：{LOG_DIR}", "GREEN")
     print_color("===== 脚本权限初始化完成 =====", "GREEN")
 
-# ========== 帮助函数（更新改名后的命令） ==========
+# ========== 帮助函数（适配交互式模式） ==========
 def show_help():
-    """展示帮助信息"""
-    help_text = f"""
-{COLORS['YELLOW']}===== 主项目一键管理脚本 ====={COLORS['NC']}
-用法：./manage.py [命令]
-命令列表：
-  starter           - 初始化：给所有脚本赋予执行权限（首次部署必做）
-  set-cron          - 配置定时任务（从settings.py读取配置）
-  check-cron        - 检查当前定时任务配置
-  cancel-cron       - 取消本项目的crontab任务（保留服务器其他任务）
-  clear-all-cron    - {COLORS['BOLD_RED']}删除所有crontab任务（高危，带警告）{COLORS['NC']}
-  sync-now          - 手动同步CSV文件（从/opt/csv_repo拉取并复制到主项目）
-  clean-remote-csv  - 删除/opt/csv_repo/result下的所有CSV文件（方便同步）
-  help              - 查看帮助
-    """
-    print(help_text.strip())
+    """展示帮助信息（支持交互式/命令行模式）"""
+    print_color("\n===== 管理员模式 - 指令列表 =====\n", "YELLOW")
+    # 按类别分组展示指令
+    base_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if k in ["starter", "help", "exit", "quit", "q"]]
+    cron_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if "cron" in k]
+    csv_cmds = [(k, v[0]) for k, v in COMMAND_MAP.items() if "csv" in k or k == "sync-now"]
+    
+    print_color("【基础指令】", "GREEN")
+    for cmd, desc in base_cmds:
+        print(f"  {cmd:<15} - {desc}")
+    
+    print_color("\n【Cron定时任务指令】", "GREEN")
+    for cmd, desc in cron_cmds:
+        print(f"  {cmd:<15} - {desc}")
+    
+    print_color("\n【CSV文件管理指令】", "GREEN")
+    for cmd, desc in csv_cmds:
+        print(f"  {cmd:<15} - {desc}")
+    
+    print_color("\n注：输入 exit/quit/q 可退出管理员模式\n", "YELLOW")
 
-# ========== 命令映射 & 主函数（更新set-cron） ==========
-def main():
-    if len(sys.argv) < 2:
-        show_help()
-        sys.exit(0)
+# ========== 交互式管理员模式 ==========
+def interactive_mode():
+    """交互式管理员模式核心逻辑"""
+    # 欢迎语
+    print_color("="*50, "YELLOW")
+    print_color("欢迎进入项目管理员模式！", "GREEN")
+    print_color("输入 'help' 查看所有可用指令，输入 'exit/quit/q' 退出", "YELLOW")
+    print_color("="*50, "YELLOW")
     
-    command = sys.argv[1]
-    command_map = {
-        "starter": starter,
-        "set-cron": cron_manager.set_cron,  # 改名：config-cron → set-cron
-        "check-cron": cron_manager.check_cron,
-        "cancel-cron": cron_manager.cancel_cron,
-        "clear-all-cron": cron_manager.clear_all_cron,
-        "sync-now": csv_manager.sync_now,
-        "clean-remote-csv": csv_manager.clean_remote_csv,
-        "help": show_help
-    }
-    
-    if command in command_map:
+    # 循环接收指令
+    while True:
         try:
-            command_map[command]()
-        except Exception as e:
-            print_color(f"❌ 执行命令{command}失败：{str(e)}", "RED")
+            # 提示输入指令
+            cmd_input = input(COLORS["GREEN"] + "\n管理员 > " + COLORS["NC"]).strip()
+            if not cmd_input:  # 空输入，重新提示
+                continue
+            
+            # 转换为小写（兼容大小写输入）
+            cmd = cmd_input.lower()
+            
+            # 退出指令
+            if cmd in ["exit", "quit", "q"]:
+                print_color("感谢使用，管理员模式已退出！", "GREEN")
+                break
+            
+            # 检查指令是否存在
+            if cmd not in COMMAND_MAP:
+                print_color(f"❌ 未知指令：{cmd}，输入 'help' 查看可用指令", "RED")
+                continue
+            
+            # 执行指令（排除退出指令）
+            cmd_desc, cmd_func = COMMAND_MAP[cmd]
+            if cmd_func:
+                print_color(f"\n===== 执行指令：{cmd}（{cmd_desc}）=====", "YELLOW")
+                try:
+                    cmd_func()  # 执行指令函数
+                    print_color(f"\n✅ 指令 '{cmd}' 执行完成", "GREEN")
+                except Exception as e:
+                    print_color(f"\n❌ 指令 '{cmd}' 执行失败：{str(e)}", "RED")
+            else:
+                # 理论上不会走到这里（退出指令已提前处理）
+                pass
+        
+        except KeyboardInterrupt:  # 捕获Ctrl+C
+            print_color("\n\n⚠️  检测到中断信号，管理员模式将退出", "YELLOW")
+            break
+        except EOFError:  # 捕获Ctrl+D
+            print_color("\n\n⚠️  检测到EOF，管理员模式将退出", "YELLOW")
+            break
+
+# ========== 主函数（适配两种模式） ==========
+def main():
+    # 模式1：命令行模式（传参数）
+    if len(sys.argv) > 1:
+        command = sys.argv[1].lower()
+        if command in COMMAND_MAP:
+            cmd_desc, cmd_func = COMMAND_MAP[command]
+            if cmd_func:
+                try:
+                    cmd_func()
+                except Exception as e:
+                    print_color(f"❌ 执行命令{command}失败：{str(e)}", "RED")
+                    sys.exit(1)
+            else:
+                # 命令行模式下输入exit/quit/q，直接退出
+                print_color("退出程序", "GREEN")
+                sys.exit(0)
+        else:
+            print_color(f"❌ 未知命令：{command}，输入 './manage.py help' 查看帮助", "RED")
             sys.exit(1)
+    # 模式2：交互式模式（无参数）
     else:
-        print_color(f"❌ 未知命令：{command}", "RED")
-        show_help()
-        sys.exit(1)
+        interactive_mode()
 
 if __name__ == "__main__":
     main()
