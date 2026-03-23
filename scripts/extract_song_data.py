@@ -5,32 +5,42 @@
 核心功能：
 1. 读取原始song_info（含song_id/歌名/别名/作者/来源/本家/更新时间/真实作者）
 2. 生成song_info/author_info/game_song_rel/song_author_rel/game_linkage_rel的CSV
-3. 路径软编码（复用settings.py的CSV_TARGET_DIR）
+3. 路径+文件名全软编码（复用settings.py的配置，无硬编码）
 4. 自动去重、格式标准化、空值处理
-5. 新增：所有表添加「最新更新时间」字段（脚本处理数据的时间）
+5. 所有表添加「最新更新时间」字段（脚本处理数据的时间）
 """
 import os
 import sys
 import pandas as pd
 from datetime import datetime
 
-# ===================== 路径配置（软编码，复用settings.py） =====================
+# ===================== 路径+文件名配置（全软编码，无硬编码） =====================
+# 获取当前脚本所在目录
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 主项目根目录（脚本目录的上一级）
 MAIN_PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
+# 将主项目根目录加入Python路径，导入settings.py
 sys.path.insert(0, MAIN_PROJECT_ROOT)
-from config.settings import CSV_TARGET_DIR
 
-# 定义输入输出路径
-RAW_SONG_CSV_PATH = os.path.join(CSV_TARGET_DIR, "song_info_raw.csv")
+# 从settings导入所有配置（路径+文件名）
+from config.settings import (
+    CSV_TARGET_DIR,
+    RAW_SONG_CSV_FILENAME,  # 原始歌曲文件名（从配置读取）
+    OUTPUT_CSV_FILENAMES    # 输出表文件名（从配置读取）
+)
+
+# 定义输入输出路径（仅拼接，无硬编码）
+RAW_SONG_CSV_PATH = os.path.join(CSV_TARGET_DIR, RAW_SONG_CSV_FILENAME)  # 原始输入路径
 OUTPUT_PATHS = {
-    "song_info": os.path.join(CSV_TARGET_DIR, "song_info.csv"),
-    "author_info": os.path.join(CSV_TARGET_DIR, "author_info.csv"),
-    "game_song_rel": os.path.join(CSV_TARGET_DIR, "game_song_rel.csv"),
-    "song_author_rel": os.path.join(CSV_TARGET_DIR, "song_author_rel.csv"),
-    "game_linkage_rel": os.path.join(CSV_TARGET_DIR, "game_linkage_rel.csv")
+    # 输出路径 = 目标目录 + 配置中的文件名
+    "song_info": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["song_info"]),
+    "author_info": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["author_info"]),
+    "game_song_rel": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["game_song_rel"]),
+    "song_author_rel": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["song_author_rel"]),
+    "game_linkage_rel": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["game_linkage_rel"])
 }
 
-# ===================== 核心工具函数（新增：当前时间函数） =====================
+# ===================== 核心工具函数 =====================
 def clean_string(val):
     """清洗字符串：空值转空字符串，去除首尾空格"""
     if pd.isna(val) or val == "":
@@ -62,7 +72,7 @@ def get_standard_date(date_str):
         return ""
 
 def get_current_datetime():
-    """新增：获取当前时间（标准格式YYYY-MM-DD HH:MM:SS），作为数据最新更新时间"""
+    """获取当前时间（标准格式YYYY-MM-DD HH:MM:SS），作为数据最新更新时间"""
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 def generate_author_id(author_name, author_map, start_num=1):
@@ -74,12 +84,12 @@ def generate_author_id(author_name, author_map, start_num=1):
         author_map[author_name] = author_id
     return author_map[author_name]
 
-# ===================== 数据提取主逻辑（新增：最新更新时间字段） =====================
+# ===================== 数据提取主逻辑 =====================
 def extract_song_data():
-    # 1. 校验原始文件是否存在
+    # 1. 校验原始文件是否存在（提示文案也适配配置的文件名）
     if not os.path.exists(RAW_SONG_CSV_PATH):
         print(f"❌ 错误：原始song_info文件不存在 → {RAW_SONG_CSV_PATH}")
-        print(f"⚠️  请将原始song_info CSV命名为 song_info_raw.csv 并放到 {CSV_TARGET_DIR} 目录下")
+        print(f"⚠️  请将原始song_info CSV命名为 {RAW_SONG_CSV_FILENAME} 并放到 {CSV_TARGET_DIR} 目录下")
         return False
 
     # 2. 读取原始数据并清洗
@@ -90,6 +100,7 @@ def extract_song_data():
         dtype=str,
         na_filter=True
     )
+    # 确保必要列存在
     required_cols = ["song_id", "歌名", "别名", "作者", "来源", "本家", "更新时间", "真实作者"]
     missing_cols = [col for col in required_cols if col not in df_raw.columns]
     if missing_cols:
@@ -236,5 +247,7 @@ def extract_song_data():
 
 # ===================== 主函数 =====================
 if __name__ == "__main__":
+    # 创建输出目录（确保存在）
     os.makedirs(CSV_TARGET_DIR, exist_ok=True)
+    # 执行数据提取
     extract_song_data()
