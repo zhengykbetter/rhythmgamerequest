@@ -21,6 +21,21 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
+# ===================== 新增：定义CSV路径字典（关键！解决OUTPUT_PATHS未定义） =====================
+# 替换为你实际的CSV文件存储路径（不是archive归档路径，是原始CSV所在路径）
+CSV_BASE_PATH = "/opt/main_project/data_csv"  # 你的CSV根目录
+OUTPUT_PATHS = {
+    "game_info": os.path.join(CSV_BASE_PATH, "game_info.csv"),
+    "author_info": os.path.join(CSV_BASE_PATH, "author_info.csv"),
+    "song_info": os.path.join(CSV_BASE_PATH, "song_info.csv"),
+    "game_song_rel": os.path.join(CSV_BASE_PATH, "game_song_rel.csv"),
+    "song_author_rel": os.path.join(CSV_BASE_PATH, "song_author_rel.csv"),
+    "game_linkage_rel": os.path.join(CSV_BASE_PATH, "game_linkage_rel.csv")
+}
+
+# 补充：定义MySQL配置（如果没定义也要加）
+MYSQL_CONFIG = "mysql+pymysql://你的用户名:你的密码@你的数据库IP:端口号/rhythmgame?charset=utf8mb4"
+
 # ===================== 路径配置 =====================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
@@ -295,10 +310,18 @@ def init_table(table_name):
     """初始化单表（新增：按field_types创建，按create_order排序）"""
     # 1. 获取表规则
     rule = TABLE_RULES[table_name]
-    # 2. 读取CSV获取字段列表
+    # 2. 读取CSV获取字段列表（补充容错：CSV不存在则用field_types的字段）
     csv_path = OUTPUT_PATHS[table_name]
-    df = pd.read_csv(csv_path, encoding="utf-8")
-    fields = df.columns.tolist() + rule["auto_cols"]  # 包含自动字段
+    try:
+        df = pd.read_csv(csv_path, encoding="utf-8")
+        fields = df.columns.tolist()  # 从CSV读取字段
+    except FileNotFoundError:
+        # CSV不存在时，从field_types提取字段（排除自动字段，后续补充）
+        fields = list(rule.get("field_types", {}).keys())
+        print(f"⚠️  {table_name}的CSV文件不存在，使用field_types定义的字段")
+    
+    # 补充自动字段（最新更新时间、update_timestamp）
+    fields = list(set(fields + rule["auto_cols"]))  # 去重
     
     # 3. 构建建表SQL（使用field_types指定类型）
     field_sql = []
@@ -314,10 +337,13 @@ def init_table(table_name):
         else:
             field_sql.append(f"`{field}` {field_type} COMMENT '{field}'")
     
-    # 4. 拼接外键
-    foreign_keys = "\n, ".join(rule["foreign_keys"]) if rule["foreign_keys"] else ""
+    # 4. 拼接外键（去重+避免重复添加）
+    foreign_keys = []
+    for fk in rule["foreign_keys"]:
+        if fk not in field_sql:
+            foreign_keys.append(fk)
     if foreign_keys:
-        field_sql.append(foreign_keys)
+        field_sql.append(", ".join(foreign_keys))
     
     # 5. 完整建表SQL
     create_sql = f"""
@@ -341,7 +367,6 @@ def init_all_tables():
     create_order = TABLE_RULES["create_order"]
     for table_name in create_order:
         init_table(table_name)
-
 # ===================== CSV处理通用函数（无修改） =====================
 def archive_csv(table_name, csv_path):
     if not csv_path or not os.path.exists(csv_path):
