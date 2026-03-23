@@ -6,6 +6,8 @@
 # ./manage.sh check-cron    # 检查cron
 # ./manage.sh sync-now      # 手动同步
 # ./manage.sh cancel-cron   # 取消本项目的crontab任务（保留其他任务）
+# ./manage.sh clear-all-cron # 删所有crontab（高危，带警告）
+# ./manage.sh clean-remote-csv # 删外部result目录的所有CSV（方便同步）
 # ./manage.sh help          # 查看帮助
 
 # ===================== 基础配置：确保Python路径正确 =====================
@@ -64,10 +66,19 @@ from config.settings import CRON_TASK_MARK
 print(CRON_TASK_MARK)
 " 2>/dev/null)
 
+# 新增：读取CSV源目录（用于clean-remote-csv）
+CSV_SOURCE_DIR=$(python3 -c "
+import sys
+sys.path.append('$(pwd)')
+from config.settings import CSV_SOURCE_DIR
+print(CSV_SOURCE_DIR)
+" 2>/dev/null)
+
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BOLD_RED='\033[1;31m'
 NC='\033[0m'
 
 # ===================== 核心函数 =====================
@@ -113,7 +124,7 @@ starter() {
 }
 
 # 配置cron（完全读取settings.py，无硬编码）
-config_cron() {
+config-cron() {
     # 先执行starter确保权限
     starter
     
@@ -167,7 +178,7 @@ config_cron() {
 }
 
 # 检查cron配置
-check_cron() {
+check-cron() {
     echo -e "${YELLOW}===== 当前服务器定时任务配置（本项目）=====${NC}"
     crontab -l | grep -A 100 "${CRON_TASK_MARK}" || echo -e "${RED}❌ 未检测到本项目定时任务${NC}"
     
@@ -180,7 +191,7 @@ check_cron() {
 }
 
 # 手动同步CSV
-sync_now() {
+sync-now() {
     # 执行starter确保权限
     starter
     
@@ -203,7 +214,7 @@ sync_now() {
 }
 
 # 取消本项目cron任务
-cancel_cron() {
+cancel-cron() {
     echo -e "${YELLOW}===== 开始取消本项目的crontab任务 =====${NC}"
     # 备份目录容错
     if [ -n "${CRON_BACKUP_DIR}" ] && [ "${CRON_BACKUP_DIR}" != "None" ]; then
@@ -240,17 +251,89 @@ cancel_cron() {
     fi
 }
 
-# 帮助信息
-show_help() {
+# 新增：带警告删除所有crontab（高危）
+clear-all-cron() {
+    echo -e "${BOLD_RED}===== 高危操作警告 =====${NC}"
+    echo -e "${BOLD_RED}此命令将删除当前用户的所有crontab任务（包括其他项目）！${NC}"
+    echo -e "${YELLOW}备份目录：${CRON_BACKUP_DIR}${NC}"
+    # 备份当前crontab
+    BACKUP_FILE="${CRON_BACKUP_DIR}/cron_full_backup_$(date +%Y%m%d_%H%M%S).log"
+    crontab -l > ${BACKUP_FILE} 2>/dev/null
+    echo -e "${GREEN}✅ 已备份所有crontab到${BACKUP_FILE}${NC}"
+    
+    # 二次确认
+    read -p "$(echo -e ${BOLD_RED}请输入 YES 确认删除所有crontab：${NC})" CONFIRM
+    if [ "${CONFIRM}" != "YES" ]; then
+        echo -e "${YELLOW}ℹ️  用户取消操作，未删除任何crontab${NC}"
+        exit 0
+    fi
+    
+    # 执行删除
+    crontab -r
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 所有crontab任务已成功删除！${NC}"
+        # 验证
+        crontab -l 2>/dev/null && echo -e "${YELLOW}ℹ️  仍有残留任务：$(crontab -l)${NC}" || echo -e "${GREEN}✅ 验证：无任何crontab任务${NC}"
+    else
+        echo -e "${RED}❌ 删除所有crontab失败！${NC}"
+        # 恢复备份
+        crontab ${BACKUP_FILE}
+        echo -e "${YELLOW}ℹ️  已恢复备份的crontab${NC}"
+        exit 1
+    fi
+}
+
+# 新增：删除外部result目录的所有CSV（方便同步）
+clean-remote-csv() {
+    echo -e "${YELLOW}===== 开始删除外部result目录的CSV文件 =====${NC}"
+    # 验证源目录配置
+    if [ -z "${CSV_SOURCE_DIR}" ] || [ "${CSV_SOURCE_DIR}" = "None" ]; then
+        echo -e "${RED}❌ 读取CSV源目录配置失败！${NC}"
+        exit 1
+    fi
+    # 检查目录是否存在
+    if [ ! -d "${CSV_SOURCE_DIR}" ]; then
+        echo -e "${YELLOW}ℹ️  CSV源目录${CSV_SOURCE_DIR}不存在，无需删除${NC}"
+        exit 0
+    fi
+    # 查找并删除CSV文件
+    CSV_FILES=$(find ${CSV_SOURCE_DIR} -maxdepth 1 -type f -name "*.csv")
+    if [ -z "${CSV_FILES}" ]; then
+        echo -e "${YELLOW}ℹ️  CSV源目录${CSV_SOURCE_DIR}下无CSV文件，无需删除${NC}"
+        exit 0
+    fi
+    # 列出要删除的文件
+    echo -e "${YELLOW}即将删除以下文件：${NC}"
+    echo "${CSV_FILES}"
+    # 确认删除
+    read -p "$(echo -e ${YELLOW}请输入 YES 确认删除：${NC})" CONFIRM
+    if [ "${CONFIRM}" != "YES" ]; then
+        echo -e "${YELLOW}ℹ️  用户取消操作，未删除任何文件${NC}"
+        exit 0
+    fi
+    # 执行删除
+    rm -f ${CSV_FILES}
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✅ 已成功删除${CSV_SOURCE_DIR}下的所有CSV文件${NC}"
+    else
+        echo -e "${RED}❌ 删除CSV文件失败！${NC}"
+        exit 1
+    fi
+}
+
+# 核心改：show_help → help
+help() {
     echo -e "${YELLOW}===== 主项目一键管理脚本 =====${NC}"
     echo "用法：./manage.sh [命令]"
     echo "命令列表："
-    echo "  starter       - 初始化：给所有脚本赋予执行权限（首次部署必做）"
-    echo "  config-cron   - 配置定时任务（从settings.py读取配置）"
-    echo "  check-cron    - 检查当前定时任务配置"
-    echo "  sync-now      - 手动执行CSV同步（拉取私有仓库+复制到主仓库）"
-    echo "  cancel-cron   - 取消本项目的crontab任务（保留服务器其他任务）"
-    echo "  help          - 查看帮助"
+    echo "  starter           - 初始化：给所有脚本赋予执行权限（首次部署必做）"
+    echo "  config-cron       - 配置定时任务（从settings.py读取配置）"
+    echo "  check-cron        - 检查当前定时任务配置"
+    echo "  sync-now          - 手动执行CSV同步（拉取私有仓库+复制到主仓库）"
+    echo "  cancel-cron       - 取消本项目的crontab任务（保留服务器其他任务）"
+    echo "  clear-all-cron    - ${BOLD_RED}删除所有crontab任务（高危，带警告）${NC}"
+    echo "  clean-remote-csv  - 删除外部result目录的所有CSV文件（方便同步）"
+    echo "  help              - 查看帮助"
 }
 
 # ===================== 主逻辑 =====================
@@ -259,18 +342,24 @@ case "$1" in
         starter
         ;;
     config-cron)
-        config_cron
+        config-cron
         ;;
     check-cron)
-        check_cron
+        check-cron
         ;;
     sync-now)
-        sync_now
+        sync-now
         ;;
     cancel-cron)
-        cancel_cron
+        cancel-cron
         ;;
-    help|*)
-        show_help
+    clear-all-cron)  # 新增命令
+        clear-all-cron
+        ;;
+    clean-remote-csv) # 新增命令
+        clean-remote-csv
+        ;;
+    help|*)  # 核心改：匹配help
+        help
         ;;
 esac

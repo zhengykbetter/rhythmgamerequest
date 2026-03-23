@@ -116,7 +116,7 @@ def copy_csv_to_main_repo():
         for f in old_files:
             os.remove(CSV_TARGET_DIR / f)
     
-    # 复制新CSV并记录细节（引用配置的文件列表）
+    # 复制新CSV并记录细节（引用配置的文件列表，自动适配songraw_info.csv）
     for csv_file in REQUIRED_CSV_FILES:
         source_path = CSV_SOURCE_DIR / csv_file
         target_path = CSV_TARGET_DIR / csv_file

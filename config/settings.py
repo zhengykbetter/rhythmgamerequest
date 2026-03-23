@@ -20,8 +20,8 @@ CSV_SOURCE_DIR = PRIVATE_CSV_REPO_ROOT / CSV_SOURCE_SUBDIR
 # CSV目标目录（主仓库下的子目录：data_csv，git忽略）
 CSV_TARGET_SUBDIR = "data_csv"
 CSV_TARGET_DIR = MAIN_REPO_ROOT / CSV_TARGET_SUBDIR
-# 需要同步的CSV文件列表
-REQUIRED_CSV_FILES = ["game_info.csv", "song_info.csv"]
+# 需要同步的CSV文件列表（核心改：song_info → songraw_info）
+REQUIRED_CSV_FILES = ["game_info.csv", "songraw_info.csv"]
 # 私有CSV仓库分支
 CSV_REPO_BRANCH = "main"
 
