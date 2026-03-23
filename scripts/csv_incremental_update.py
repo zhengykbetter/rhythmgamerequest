@@ -4,10 +4,11 @@
 CSV增量更新MySQL数据库（适配6张核心表）
 核心规则：
 1. game_info仅记录维护的游戏，game_linkage_rel放开外键约束
-2. 游戏多次联动通过rel_id=游戏1编号_游戏2编号_联动时间（8位日期）区分
-3. author_info统一管理作者别称，支持模糊搜索
+2. 游戏多次联动通过rel_id=游戏1编号_游戏2编号_8位联动时间（如11_12_202603）区分
+3. author_info统一管理别称，支持模糊搜索
 4. game_info新增「最新更新时间」列，自动刷新；支持增/改/删全量同步，保证DB与CSV完全一致
 5. 新增CSV状态持久化，减少重复更新（对比MD5，无变化则跳过）
+6. clear命令仅支持删除所有6张表结构（不可逆，需谨慎）
 配置来源：
 - 非敏感路径：/config/settings.py
 - 敏感信息：.env 文件（git忽略）
@@ -354,45 +355,43 @@ def incremental_update_single(table_name):
     save_processed_state(processed_state)
     return True
 
-# ===================== 清空表函数（测试用） =====================
-def clear_table(table_name=None):
-    """清空指定表/所有表（谨慎执行）"""
-    # 1. 清空单个表
-    if table_name:
-        # 校验表名
-        if table_name not in CSV_PATHS:
-            print(f"❌ 错误：不支持的表名 {table_name}")
-            return False
-        # 二次确认
-        confirm = input(f"⚠️  确认清空 {table_name} 表？输入 YES 确认：")
-        if confirm != "YES":
-            print("ℹ️  取消清空操作")
-            return False
-        # 执行清空
-        engine = get_mysql_engine()
-        with engine.connect() as conn:
-            conn.execute(text(f"TRUNCATE TABLE {table_name};"))
-            conn.commit()
-        print(f"✅ {table_name} 表已清空！")
-        return True
-
-    # 2. 清空所有表（按外键依赖顺序）
-    confirm = input(f"⚠️  确认清空数据库所有6张表？输入 YES 确认：")
-    if confirm != "YES":
-        print("ℹ️  取消清空操作")
+# ===================== 修改后：删除所有6张表结构（替代原clear逻辑） =====================
+def drop_all_tables():
+    """删除所有6张表结构（不可逆，按外键依赖顺序删除）"""
+    # 二次确认（强化风险提示）
+    print("⚠️  警告：此操作将删除所有6张表的结构和数据，且无法恢复！")
+    confirm1 = input("请输入 YES 确认删除：")
+    if confirm1 != "YES":
+        print("ℹ️  取消删除操作")
         return False
+    
+    # 二次验证（防止误触）
+    confirm2 = input("请再次输入 YES 确认永久删除：")
+    if confirm2 != "YES":
+        print("ℹ️  取消删除操作")
+        return False
+
     engine = get_mysql_engine()
     with engine.connect() as conn:
-        # 先清空关联表（避免外键约束报错）
-        conn.execute(text("TRUNCATE TABLE game_song_rel;"))
-        conn.execute(text("TRUNCATE TABLE song_author_rel;"))
-        conn.execute(text("TRUNCATE TABLE game_linkage_rel;"))
-        # 再清空基础表
-        conn.execute(text("TRUNCATE TABLE game_info;"))
-        conn.execute(text("TRUNCATE TABLE song_info;"))
-        conn.execute(text("TRUNCATE TABLE author_info;"))
+        # 步骤1：先删关联表（依赖基础表，必须先删）
+        drop_tables_order = [
+            "game_song_rel",
+            "song_author_rel",
+            "game_linkage_rel",
+            "game_info",
+            "song_info",
+            "author_info"
+        ]
+        
+        for table in drop_tables_order:
+            try:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table};"))
+                print(f"🗑️ 成功删除表：{table}")
+            except Exception as e:
+                print(f"⚠️  删除表 {table} 时出错：{str(e)}")
+        
         conn.commit()
-    print("✅ 数据库所有6张表已清空！")
+    print("✅ 所有6张表已成功删除（结构+数据全部清除）！")
     return True
 
 # ===================== 主函数（命令行交互） =====================
@@ -403,21 +402,14 @@ def main():
     # 解析命令行参数
     if len(sys.argv) == 1:
         print("📖 使用说明：")
-        print("  1. 全量同步单个表：python3 csv_incremental_update.py [表名] （示例：python3 csv_incremental_update.py game_info）")
-        print("  2. 清空单个表：python3 csv_incremental_update.py clear [表名] （示例：python3 csv_incremental_update.py clear game_info）")
-        print("  3. 清空所有表：python3 csv_incremental_update.py clear all")
-        print("  备注：game_info支持增/改/删全量同步，保证DB与CSV完全一致，新增「最新更新时间」列自动刷新")
+        print("  1. 全量同步game_info表：python3 csv_incremental_update.py game_info")
+        print("     （支持增/改/删全量同步，保证DB与CSV完全一致，新增「最新更新时间」列自动刷新）")
+        print("  2. 删除所有6张表结构（不可逆）：python3 csv_incremental_update.py clear")
         sys.exit(0)
 
-    # 处理清空逻辑
+    # 处理删除所有表逻辑
     if sys.argv[1] == "clear":
-        if len(sys.argv) == 3:
-            if sys.argv[2] == "all":
-                clear_table()  # 清空所有表
-            else:
-                clear_table(sys.argv[2])  # 清空单个表
-        else:
-            print("❌ 错误：清空表需指定表名或 all，示例：clear game_info 或 clear all")
+        drop_all_tables()
         return
 
     # 处理全量同步逻辑
