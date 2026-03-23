@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-主管理脚本：终极修复版
-解决问题：
-  1. run_shell_cmd 移除非法的 check 参数
-  2. 补全所有缺失函数（clean_old/extract/sync_db/sync_now/auto_run）
-  3. 确保所有指令映射的函数存在
-  4. 兼容所有路径/配置逻辑
+主管理脚本：终极修复版（指令全短横线 + 无报错）
+支持指令：starter / config-cron / check-cron / cancel-cron / clear-all-cron / clean-old / extract / sync-db / sync-now / auto / help
 """
 import os
 import sys
@@ -33,11 +29,9 @@ YELLOW = '\033[1;33m'
 BOLD_RED = '\033[1;31m'
 NC = '\033[0m'  # 重置颜色
 
-# ===================== 核心工具函数（修复check参数问题） =====================
+# ===================== 核心工具函数 =====================
 def run_shell_cmd(cmd, capture_output=False):
-    """执行shell命令，返回(输出, 错误, 退出码)
-    移除了非法的check参数，仅保留capture_output
-    """
+    """执行shell命令，返回(输出, 错误, 退出码)"""
     if capture_output:
         result = subprocess.run(
             cmd, shell=True, capture_output=True, text=True,
@@ -69,6 +63,7 @@ def get_full_config():
         "CSV_MANAGE_SCRIPT": os.path.join(os.getcwd(), "managers", "csv_manage.py"),
         "CSV_ROOT_DIR": os.path.join(os.getcwd(), "data", "csv"),
         "ARCHIVE_DIR": os.path.join(os.getcwd(), "data", "csv", "archive"),
+        "CSV_SOURCE_DIR": os.path.join(os.getcwd(), "data", "csv", "source"),  # 补充默认值
         "DB_CONFIG": {
             "host": "localhost", "port": 3306, "user": "root",
             "password": "", "database": "rhythmgame", "charset": "utf8mb4"
@@ -84,10 +79,11 @@ def get_full_config():
     else:
         print(f"{YELLOW}ℹ️  未读取到settings.py，使用默认配置（{IMPORT_ERROR_MSG}）{NC}")
 
-    # 创建必要目录
+    # 创建必要目录（含CSV_SOURCE_DIR）
     for dir_path in [
         default_config["LOG_DIR"], default_config["CRON_BACKUP_DIR"],
         default_config["CSV_ROOT_DIR"], default_config["ARCHIVE_DIR"],
+        default_config["CSV_SOURCE_DIR"],  # 创建源目录
         os.path.dirname(default_config["CRON_MANAGE_SCRIPT"]),
         os.path.dirname(default_config["CSV_MANAGE_SCRIPT"])
     ]:
@@ -123,14 +119,13 @@ def starter(config):
     
     print(f"{GREEN}===== 权限初始化完成 ====={NC}")
 
-# ===================== 2. Cron管理（核心修复） =====================
+# ===================== 2. Cron管理 =====================
 def config_cron(config):
     """配置Cron任务"""
     starter(config)
     if not os.path.exists(config["CRON_MANAGE_SCRIPT"]):
         print(f"{RED}❌ cron_manage.py不存在：{config['CRON_MANAGE_SCRIPT']}{NC}")
         return False
-    # 修复：移除check=True参数
     stdout, stderr, returncode = run_shell_cmd(
         f"{config['PYTHON_EXEC_PATH']} {config['CRON_MANAGE_SCRIPT']} config",
         capture_output=True
@@ -196,17 +191,16 @@ def clear_all_cron(config):
         print(f"{RED}❌ 清除失败：{stderr}{NC}")
         return False
 
-# ===================== 3. CSV/DB管理（补全所有缺失函数） =====================
+# ===================== 3. CSV/DB管理（短横线指令对应函数） =====================
 def clean_old(config):
     """清理旧CSV文件"""
     print(f"{YELLOW}===== 清理旧CSV文件 ====={NC}")
     if not os.path.exists(config["CSV_MANAGE_SCRIPT"]):
         print(f"{RED}❌ csv_manage.py不存在：{config['CSV_MANAGE_SCRIPT']}{NC}")
         return False
-    stdout, stderr, returncode = run_shell_cmd(
-        f"{config['PYTHON_EXEC_PATH']} {config['CSV_MANAGE_SCRIPT']} clean_old",
-        capture_output=True
-    )
+    # 传递CSV_ROOT_DIR到csv_manage.py（避免KeyError）
+    cmd = f"{config['PYTHON_EXEC_PATH']} {config['CSV_MANAGE_SCRIPT']} clean-old --csv-root-dir {config['CSV_ROOT_DIR']}"
+    stdout, stderr, returncode = run_shell_cmd(cmd, capture_output=True)
     if returncode == 0:
         print(f"{GREEN}✅ 旧CSV清理完成：{stdout}{NC}")
         return True
@@ -238,7 +232,7 @@ def sync_db(config):
         print(f"{RED}❌ csv_manage.py不存在：{config['CSV_MANAGE_SCRIPT']}{NC}")
         return False
     stdout, stderr, returncode = run_shell_cmd(
-        f"{config['PYTHON_EXEC_PATH']} {config['CSV_MANAGE_SCRIPT']} sync_db",
+        f"{config['PYTHON_EXEC_PATH']} {config['CSV_MANAGE_SCRIPT']} sync-db",
         capture_output=True
     )
     if returncode == 0:
@@ -267,10 +261,10 @@ def sync_now(config):
 
 # ===================== 4. 全自动流程 =====================
 def auto_run(config):
-    """全自动执行：clean_old → extract → sync_db → sync_now"""
+    """全自动执行：clean-old → extract → sync-db → sync-now"""
     print(f"{YELLOW}===== 开始全自动执行 ====={NC}")
     try:
-        # 分步执行
+        # 分步执行（短横线指令对应函数）
         clean_old(config)
         print("-" * 40)
         extract(config)
@@ -284,9 +278,9 @@ def auto_run(config):
         print(f"{RED}❌ 全自动执行失败：{str(e)}{NC}")
         return False
 
-# ===================== 5. 帮助信息 =====================
+# ===================== 5. 帮助信息（短横线指令） =====================
 def show_help():
-    """展示帮助"""
+    """展示帮助（全短横线指令）"""
     print(f"{YELLOW}===== 项目管理脚本指令说明 ====={NC}")
     print("用法：python3 manage.py [指令]")
     print("\n【1. 初始化/权限】")
@@ -297,16 +291,16 @@ def show_help():
     print("  cancel-cron        - 清除本项目Cron任务")
     print(f"  clear-all-cron     - {BOLD_RED}清除所有Cron任务（危险！）{NC}")
     print("\n【3. CSV/DB管理】")
-    print("  clean_old          - 清理旧CSV文件（保留_raw）")
+    print("  clean-old          - 清理旧CSV文件（保留_raw）")
     print("  extract            - 转换原始CSV为目标格式")
-    print("  sync_db            - 同步CSV到MySQL")
+    print("  sync-db            - 同步CSV到MySQL")
     print("  sync-now           - 手动同步远程CSV")
     print("\n【4. 全自动】")
-    print("  auto               - 一键执行：clean_old→extract→sync_db→sync_now")
+    print("  auto               - 一键执行：clean-old→extract→sync-db→sync-now")
     print("\n【5. 其他】")
     print("  help               - 查看此帮助信息")
 
-# ===================== 主入口 =====================
+# ===================== 主入口（全短横线指令映射） =====================
 def main():
     if len(sys.argv) < 2:
         show_help()
@@ -315,17 +309,17 @@ def main():
     # 读取配置
     config = get_full_config()
 
-    # 指令映射（确保所有函数存在）
+    # 指令映射（全短横线，无下划线）
     command_map = {
         "starter": lambda: starter(config),
         "config-cron": lambda: config_cron(config),
         "check-cron": lambda: check_cron(config),
         "cancel-cron": lambda: cancel_cron(config),
         "clear-all-cron": lambda: clear_all_cron(config),
-        "clean_old": lambda: clean_old(config),
+        "clean-old": lambda: clean_old(config),  # 短横线
         "extract": lambda: extract(config),
-        "sync_db": lambda: sync_db(config),
-        "sync-now": lambda: sync_now(config),
+        "sync-db": lambda: sync_db(config),      # 短横线
+        "sync-now": lambda: sync_now(config),    # 短横线
         "auto": lambda: auto_run(config),
         "help": show_help
     }
