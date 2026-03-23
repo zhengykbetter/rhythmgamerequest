@@ -2,26 +2,30 @@ import os
 from pathlib import Path
 
 # ===================== 基础核心配置 =====================
-BASE_DIR = Path(__file__).resolve().parent.parent  # 项目根目录
+BASE_DIR = Path(__file__).resolve().parent.parent  # 项目根目录（Path对象）
 MAIN_REPO_ROOT = str(BASE_DIR)
 PYTHON_EXEC_PATH = "python3"  # Python执行路径
 
 # ===================== 日志配置（2026-03-23 增量更新：修复路径拼接类型错误） =====================
-LOG_DIR = Path(BASE_DIR) / "logs"  # 改为Path对象（解决脚本/拼接报错），原有str改为Path
-LOG_FILE_PREFIX = "sync_csv_"      # 保留：日志文件前缀
-LOG_FILE_SUFFIX = ".log"           # 保留：日志文件后缀
-LOG_DATE_FORMAT = "%Y%m%d"         # 保留：日志文件名中的日期格式
-LOG_ENCODING = "utf-8"             # 保留：日志文件编码
-os.makedirs(LOG_DIR, exist_ok=True)# 兼容：os.makedirs支持Path对象
-CRON_BACKUP_DIR = str(LOG_DIR)     # 兼容：转为字符串，不影响其他依赖str的逻辑
+LOG_DIR = Path(BASE_DIR) / "logs"  # Path对象（兼容脚本/拼接）
+LOG_FILE_PREFIX = "sync_csv_"      # 日志文件前缀
+LOG_FILE_SUFFIX = ".log"           # 日志文件后缀
+LOG_DATE_FORMAT = "%Y%m%d"         # 日志文件名中的日期格式
+LOG_ENCODING = "utf-8"             # 日志文件编码
+os.makedirs(LOG_DIR, exist_ok=True)# 自动创建日志目录
+CRON_BACKUP_DIR = str(LOG_DIR)     # 兼容字符串路径的逻辑
 
-# ===================== CSV 全量配置（适配你的场景，无冗余） =====================
-# 1. 核心本地目录（CSV存储/归档）
-CSV_ROOT_DIR = os.path.join(BASE_DIR, "data", "csv")          # 本地CSV根目录
-CSV_TARGET_DIR = CSV_ROOT_DIR                                # 兼容子脚本的目标目录变量
-CSV_SOURCE_DIR = os.path.join(CSV_ROOT_DIR, "source")        # 临时下载目录（备用）
-ARCHIVE_DIR = os.path.join(CSV_ROOT_DIR, "archive")          # 旧文件归档目录
-# 自动创建所有本地目录（避免运行时报错）
+# ===================== CSV 全量配置（2026-03-23 增量更新：统一Path类型，修复拼接错误） =====================
+# 1. 核心本地目录（改为Path对象，兼容脚本/拼接；新增_STR后缀变量兼容字符串逻辑）
+CSV_ROOT_DIR = Path(BASE_DIR) / "data" / "csv"          # Path对象：本地CSV根目录
+CSV_ROOT_DIR_STR = str(CSV_ROOT_DIR)                    # 兼容字符串版本（不影响原有逻辑）
+CSV_TARGET_DIR = CSV_ROOT_DIR                            # Path对象：兼容子脚本目标目录
+CSV_TARGET_DIR_STR = str(CSV_TARGET_DIR)                # 兼容字符串版本
+CSV_SOURCE_DIR = CSV_ROOT_DIR / "source"                # Path对象：临时下载目录
+CSV_SOURCE_DIR_STR = str(CSV_SOURCE_DIR)                # 兼容字符串版本
+ARCHIVE_DIR = CSV_ROOT_DIR / "archive"                  # Path对象：旧文件归档目录
+ARCHIVE_DIR_STR = str(ARCHIVE_DIR)                      # 兼容字符串版本
+# 自动创建所有本地目录（支持Path对象）
 os.makedirs(CSV_ROOT_DIR, exist_ok=True)
 os.makedirs(CSV_SOURCE_DIR, exist_ok=True)
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
@@ -29,8 +33,9 @@ os.makedirs(ARCHIVE_DIR, exist_ok=True)
 # 2. 远程Git仓库配置（你的仓库+指定data_csv路径）
 CSV_REPO_URL = "https://github.com/zhengykbetter/rhythmgamebase.git"  # 你的仓库地址
 CSV_REPO_BRANCH = "main"                                             # 仓库分支
-CSV_REPO_LOCAL_PATH = os.path.join(BASE_DIR, "data", "csv-repo")     # 本地克隆仓库的路径
-PRIVATE_CSV_REPO_ROOT = "data_csv"                                   # 仓库内CSV文件的存放路径（你要求的/data_csv）
+CSV_REPO_LOCAL_PATH = Path(BASE_DIR) / "data" / "csv-repo"           # Path对象：本地克隆仓库路径
+CSV_REPO_LOCAL_PATH_STR = str(CSV_REPO_LOCAL_PATH)                   # 兼容字符串版本
+PRIVATE_CSV_REPO_ROOT = "data_csv"                                   # 仓库内CSV文件的存放路径
 # 自动创建仓库本地存储目录
 os.makedirs(CSV_REPO_LOCAL_PATH, exist_ok=True)
 
@@ -44,24 +49,24 @@ REQUIRED_CSV_FILES = [
     "game_linkage_rel_raw.csv"
 ]
 
-# 4. 源文件路径（原始CSV，本地存储路径）
+# 4. 源文件路径（原始CSV，兼容字符串路径）
 RAW_FILES = {
-    "game_info": os.path.join(CSV_ROOT_DIR, "game_info_raw.csv"),
-    "song_info": os.path.join(CSV_ROOT_DIR, "song_info_raw.csv"),
-    "author_info": os.path.join(CSV_ROOT_DIR, "author_info_raw.csv"),
-    "game_song_rel": os.path.join(CSV_ROOT_DIR, "game_song_rel_raw.csv"),
-    "song_author_rel": os.path.join(CSV_ROOT_DIR, "song_author_rel_raw.csv"),
-    "game_linkage_rel": os.path.join(CSV_ROOT_DIR, "game_linkage_rel_raw.csv")
+    "game_info": os.path.join(CSV_ROOT_DIR_STR, "game_info_raw.csv"),
+    "song_info": os.path.join(CSV_ROOT_DIR_STR, "song_info_raw.csv"),
+    "author_info": os.path.join(CSV_ROOT_DIR_STR, "author_info_raw.csv"),
+    "game_song_rel": os.path.join(CSV_ROOT_DIR_STR, "game_song_rel_raw.csv"),
+    "song_author_rel": os.path.join(CSV_ROOT_DIR_STR, "song_author_rel_raw.csv"),
+    "game_linkage_rel": os.path.join(CSV_ROOT_DIR_STR, "game_linkage_rel_raw.csv")
 }
 
-# 5. 目标文件路径（处理后的CSV，本地存储路径）
+# 5. 目标文件路径（处理后的CSV，兼容字符串路径）
 TARGET_FILES = {
-    "game_info": os.path.join(CSV_ROOT_DIR, "game_info.csv"),
-    "song_info": os.path.join(CSV_ROOT_DIR, "song_info.csv"),
-    "author_info": os.path.join(CSV_ROOT_DIR, "author_info.csv"),
-    "game_song_rel": os.path.join(CSV_ROOT_DIR, "game_song_rel.csv"),
-    "song_author_rel": os.path.join(CSV_ROOT_DIR, "song_author_rel.csv"),
-    "game_linkage_rel": os.path.join(CSV_ROOT_DIR, "game_linkage_rel.csv")
+    "game_info": os.path.join(CSV_ROOT_DIR_STR, "game_info.csv"),
+    "song_info": os.path.join(CSV_ROOT_DIR_STR, "song_info.csv"),
+    "author_info": os.path.join(CSV_ROOT_DIR_STR, "author_info.csv"),
+    "game_song_rel": os.path.join(CSV_ROOT_DIR_STR, "game_song_rel.csv"),
+    "song_author_rel": os.path.join(CSV_ROOT_DIR_STR, "song_author_rel.csv"),
+    "game_linkage_rel": os.path.join(CSV_ROOT_DIR_STR, "game_linkage_rel.csv")
 }
 
 # 6. 旧文件清理配置
@@ -71,8 +76,8 @@ CLEAN_CONFIG = {
     "archive_old_files": True        # 清理前先归档
 }
 
-# 7. 状态文件（记录CSV处理进度/状态）
-STATE_FILE_PATH = os.path.join(CSV_ROOT_DIR, "csv_processed_state.json")
+# 7. 状态文件（记录CSV处理进度/状态，兼容字符串路径）
+STATE_FILE_PATH = os.path.join(CSV_ROOT_DIR_STR, "csv_processed_state.json")
 
 # ===================== 数据库配置 =====================
 DB_CONFIG = {
