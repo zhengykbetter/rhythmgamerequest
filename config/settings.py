@@ -6,8 +6,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # 项目根目录
 MAIN_REPO_ROOT = str(BASE_DIR)
 PYTHON_EXEC_PATH = "python3"  # Python执行路径
 
-# ===================== 日志配置 =====================
+# ===================== 日志配置（补全LOG_FILE_PREFIX） =====================
 LOG_DIR = os.path.join(BASE_DIR, "logs")
+LOG_FILE_PREFIX = "sync_csv_"  # 同步CSV脚本的日志文件前缀（解决本次报错）
 os.makedirs(LOG_DIR, exist_ok=True)
 CRON_BACKUP_DIR = LOG_DIR  # Cron备份目录
 
@@ -93,3 +94,9 @@ SYNC_SCRIPT = os.path.join(BASE_DIR, "scripts", "sync_csv_from_remote.py")      
 EXTRACT_SONG_SCRIPT = os.path.join(BASE_DIR, "scripts", "extract_song_data.py")  # CSV解析脚本
 CRON_MANAGE_SCRIPT = os.path.join(BASE_DIR, "managers", "cron_manage.py")        # Cron管理脚本
 CSV_MANAGE_SCRIPT = os.path.join(BASE_DIR, "managers", "csv_manage.py")          # CSV管理脚本
+
+# ===================== 兜底配置（防止任何可能的变量缺失） =====================
+# 同步超时配置
+SYNC_TIMEOUT = 60  # 整体同步流程超时时间（60秒）
+# 重试配置
+SYNC_RETRY_TIMES = 3  # 同步失败后重试次数
