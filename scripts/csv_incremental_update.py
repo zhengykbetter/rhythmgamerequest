@@ -291,20 +291,56 @@ def generate_create_table_sql(table_name):
     """
     return create_sql
 
+def init_table(table_name):
+    """初始化单表（新增：按field_types创建，按create_order排序）"""
+    # 1. 获取表规则
+    rule = TABLE_RULES[table_name]
+    # 2. 读取CSV获取字段列表
+    csv_path = OUTPUT_PATHS[table_name]
+    df = pd.read_csv(csv_path, encoding="utf-8")
+    fields = df.columns.tolist() + rule["auto_cols"]  # 包含自动字段
+    
+    # 3. 构建建表SQL（使用field_types指定类型）
+    field_sql = []
+    for field in fields:
+        # 优先使用显式指定的类型，否则默认VARCHAR(255)
+        field_type = rule.get("field_types", {}).get(field, "VARCHAR(255)")
+        # 主键处理
+        if field == rule["primary_key"]:
+            field_sql.append(f"`{field}` {field_type} NOT NULL PRIMARY KEY COMMENT '主键'")
+        # 自动时间戳处理
+        elif field == "update_timestamp":
+            field_sql.append(f"`{field}` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '系统更新时间戳'")
+        else:
+            field_sql.append(f"`{field}` {field_type} COMMENT '{field}'")
+    
+    # 4. 拼接外键
+    foreign_keys = "\n, ".join(rule["foreign_keys"]) if rule["foreign_keys"] else ""
+    if foreign_keys:
+        field_sql.append(foreign_keys)
+    
+    # 5. 完整建表SQL
+    create_sql = f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            {', '.join(field_sql)}
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='{table_name}（自动生成）';
+    """
+    
+    # 执行建表
+    try:
+        engine = create_engine(MYSQL_CONFIG)
+        with engine.connect() as conn:
+            conn.execute(text(create_sql))
+            conn.commit()
+        print(f"✅ 成功初始化表 {table_name}（自动生成表结构）")
+    except Exception as e:
+        print(f"⚠️  初始化表 {table_name} 失败：{e}")
+
+# 批量初始化表（按create_order顺序）
 def init_all_tables():
-    """全自动初始化表结构（从CSV推断字段，无需硬编码）"""
-    engine = get_mysql_engine()
-    with engine.connect() as conn:
-        for table_name in TABLE_RULES.keys():
-            try:
-                # 动态生成建表SQL
-                create_sql = generate_create_table_sql(table_name)
-                conn.execute(text(create_sql))
-                print(f"✅ 成功初始化表 {table_name}（自动生成表结构）")
-            except Exception as e:
-                print(f"⚠️  初始化表 {table_name} 失败：{str(e)}")
-        conn.commit()
-    print("\n✅ 所有表初始化完成！")
+    create_order = TABLE_RULES["create_order"]
+    for table_name in create_order:
+        init_table(table_name)
 
 # ===================== CSV处理通用函数（无修改） =====================
 def archive_csv(table_name, csv_path):
