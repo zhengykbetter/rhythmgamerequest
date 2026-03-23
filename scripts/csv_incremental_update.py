@@ -40,17 +40,15 @@ CSV_PATHS = {
     "song_author_rel": str(CSV_TARGET_DIR / "song_author_rel.csv"),
     "game_linkage_rel": str(CSV_TARGET_DIR / "game_linkage_rel.csv")
 }
-
 TABLE_RULES = {
-    # 新增：指定建表顺序（基础表在前，关联表在后，解决外键依赖）
+    # 新增：指定建表顺序（基础表在前，关联表在后）
     "create_order": ["game_info", "author_info", "song_info", "game_song_rel", "song_author_rel", "game_linkage_rel"],
     
-    # 基础表：游戏信息表（补充缺失的配置，解决game_song_rel外键依赖）
+    # 基础表：游戏信息表（清空外键）
     "game_info": {
         "primary_key": "游戏编号",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": ["实装时间", "更新时间", "数据时间", "开服时间"],
-        # 新增：显式指定字段类型，避免脚本自动推断错误
         "field_types": {
             "游戏编号": "VARCHAR(100)",
             "游戏": "VARCHAR(200)",
@@ -63,15 +61,14 @@ TABLE_RULES = {
             "update_timestamp": "DATETIME"
         },
         "varchar_length": {"游戏": 200, "别名": 200},
-        "foreign_keys": []
+        "foreign_keys": []  # 清空外键
     },
 
-    # 基础表：作者信息表
+    # 基础表：作者信息表（清空外键）
     "author_info": {
         "primary_key": "author_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": [],
-        # 新增：显式指定字段类型，杜绝FLOAT/INT错误推断
         "field_types": {
             "author_id": "VARCHAR(50)",
             "作者本名": "VARCHAR(300)",
@@ -82,15 +79,14 @@ TABLE_RULES = {
             "update_timestamp": "DATETIME"
         },
         "varchar_length": {"author_id": 50, "作者本名": 300, "作者别称": 500, "擅长风格": 200, "备注": 500},
-        "foreign_keys": []
+        "foreign_keys": []  # 清空外键
     },
 
-    # 基础表：歌曲信息表
+    # 基础表：歌曲信息表（清空外键）
     "song_info": {
         "primary_key": "song_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": ["歌曲更新时间"],
-        # 新增：显式指定song_id为VARCHAR，避免推断为INT
         "field_types": {
             "song_id": "VARCHAR(50)",
             "歌名": "VARCHAR(200)",
@@ -100,15 +96,14 @@ TABLE_RULES = {
             "update_timestamp": "DATETIME"
         },
         "varchar_length": {"song_id": 50, "歌名": 200, "别名": 200},
-        "foreign_keys": []
+        "foreign_keys": []  # 清空外键
     },
 
-    # 关联表：游戏-歌曲关联表（修正外键写法，加反引号适配中文字段）
+    # 关联表：游戏-歌曲关联表（清空外键）
     "game_song_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": ["收录时间"],
-        # 新增：显式指定所有字段类型，杜绝FLOAT错误
         "field_types": {
             "rel_id": "VARCHAR(200)",
             "游戏编号": "VARCHAR(100)",
@@ -119,20 +114,17 @@ TABLE_RULES = {
             "update_timestamp": "DATETIME"
         },
         "varchar_length": {"rel_id": 200, "游戏编号": 100, "song_id": 50, "收录版本": 50},
-        "foreign_keys": [
-            "FOREIGN KEY (`游戏编号`) REFERENCES game_info(`游戏编号`) ON DELETE CASCADE"  # 中文字段加反引号
-        ]
+        "foreign_keys": []  # 清空外键（核心修改：删除原外键配置）
     },
 
-    # 关联表：歌曲-作者关联表（修正外键类型兼容问题）
+    # 关联表：歌曲-作者关联表（清空外键）
     "song_author_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": [],
-        # 新增：显式指定字段类型，杜绝FLOAT错误
         "field_types": {
             "rel_id": "VARCHAR(100)",
-            "song_id": "VARCHAR(50)",  # 与song_info的song_id类型一致
+            "song_id": "VARCHAR(50)",
             "author_id": "VARCHAR(50)",
             "合作类型": "VARCHAR(50)",
             "备注": "VARCHAR(500)",
@@ -140,18 +132,14 @@ TABLE_RULES = {
             "update_timestamp": "DATETIME"
         },
         "varchar_length": {"rel_id": 100, "song_id": 50, "author_id": 50, "合作类型": 50, "备注": 500},
-        "foreign_keys": [
-            "FOREIGN KEY (song_id) REFERENCES song_info(song_id) ON DELETE CASCADE",
-            "FOREIGN KEY (author_id) REFERENCES author_info(author_id) ON DELETE CASCADE"
-        ]
+        "foreign_keys": []  # 清空外键（核心修改：删除原外键配置）
     },
 
-    # 关联表：游戏联动表
+    # 关联表：游戏联动表（清空外键）
     "game_linkage_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": ["联动时间"],
-        # 新增：显式指定字段类型
         "field_types": {
             "rel_id": "VARCHAR(200)",
             "游戏1编号": "VARCHAR(100)",
@@ -166,7 +154,7 @@ TABLE_RULES = {
             "update_timestamp": "DATETIME"
         },
         "varchar_length": {"rel_id": 200, "游戏1编号": 100, "游戏2编号": 50, "游戏1名称": 200, "游戏2名称": 200, "联动名称": 200, "联动版本": 50, "说明": 500},
-        "foreign_keys": []
+        "foreign_keys": []  # 清空外键
     }
 }
 # 3. 类型映射（Python类型 → MySQL类型）
