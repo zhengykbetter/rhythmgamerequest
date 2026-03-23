@@ -29,8 +29,8 @@ sys.path.insert(0, MAIN_PROJECT_ROOT)
 # ===================== 导入配置 =====================
 # 加载.env敏感配置
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))  # 明确指定.env路径
-# 导入公开配置（setting.py）
-from config.setting import (
+# 导入公开配置（settings.py）
+from config.settings import (
     CSV_TARGET_DIR,  # game_info.csv所在目录
     ARCHIVE_DIR as SETTING_ARCHIVE_DIR,  # 存档目录（若setting里有，否则用下面的）
     DB_CONFIG  # 数据库配置（从环境变量读取敏感信息）
