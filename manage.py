@@ -51,24 +51,21 @@ def run_shell_cmd(cmd, capture_output=False):
         return "", "", 0
 
 def get_full_config():
-    """读取settings.py配置（兼容默认值，CRON默认每天2点）"""
-    # 基础默认配置
+    """读取settings.py配置（兼容默认值，容错单个变量缺失）"""
+    # 基础默认配置（已有）
     default_config = {
         "PYTHON_EXEC_PATH": "python3",
         "MAIN_REPO_ROOT": os.getcwd(),
         "LOG_DIR": os.path.join(os.getcwd(), "logs"),
         "CRON_BACKUP_DIR": os.path.join(os.getcwd(), "logs"),
         "CRON_TASK_MARK": "# 节奏游戏项目定时任务",
-        # 默认CRON：每天凌晨2点执行auto，日志输出到logs（修复重定向语法）
         "CRON_TASKS": [
-            f"0 2 * * * {os.path.join(os.getcwd(), 'venv/bin/python3') if os.path.exists(os.path.join(os.getcwd(), 'venv/bin/python3')) else 'python3'} {os.path.join(os.getcwd(), 'manage.py')} auto > {os.path.join(os.getcwd(), 'logs', 'auto_cron.log')} 2>&1"
+            f"0 2 * * * python3 {os.path.join(os.getcwd(), 'manage.py')} auto > {os.path.join(os.getcwd(), 'logs', 'auto_cron.log')} 2>&1"
         ],
-        # 脚本路径（基于项目根目录）
         "SYNC_SCRIPT": os.path.join(os.getcwd(), "scripts", "sync_csv_from_remote.py"),
         "EXTRACT_SONG_SCRIPT": os.path.join(os.getcwd(), "scripts", "extract_song_data.py"),
         "CRON_MANAGE_SCRIPT": os.path.join(os.getcwd(), "managers", "cron_manage.py"),
         "CSV_MANAGE_SCRIPT": os.path.join(os.getcwd(), "managers", "csv_manage.py"),
-        # CSV/DB配置
         "CSV_ROOT_DIR": os.path.join(os.getcwd(), "data", "csv"),
         "ARCHIVE_DIR": os.path.join(os.getcwd(), "data", "csv", "archive"),
         "DB_CONFIG": {
@@ -77,23 +74,21 @@ def get_full_config():
         }
     }
 
-    # 从settings.py覆盖配置（优先级更高）
+    # ========== 优化：逐个导入变量，容错缺失 ==========
     try:
-        from config.settings import (
-            PYTHON_EXEC_PATH, MAIN_REPO_ROOT, LOG_DIR, CRON_BACKUP_DIR,
-            CRON_TASKS, CRON_TASK_MARK, SYNC_SCRIPT, EXTRACT_SONG_SCRIPT,
-            CRON_MANAGE_SCRIPT, CSV_MANAGE_SCRIPT, CSV_ROOT_DIR, ARCHIVE_DIR, DB_CONFIG
-        )
-        # 仅覆盖非空配置
-        for key in locals().keys():
-            if key in default_config and locals()[key] is not None:
+        from config.settings import *  # 导入所有变量
+        # 仅覆盖默认配置中存在、且settings.py中已定义的变量
+        for key in default_config.keys():
+            if key in locals() and locals()[key] is not None:
                 default_config[key] = locals()[key]
+        print(f"{GREEN}✅ 成功读取settings.py配置{NC}")
     except ImportError as e:
-        print(f"{YELLOW}ℹ️  未读取到settings.py，使用默认配置（{e}）{NC}")
+        # 仅打印警告，使用默认配置
+        print(f"{YELLOW}ℹ️  读取settings.py部分变量失败（{e}），使用默认配置{NC}")
     except Exception as e:
-        print(f"{YELLOW}ℹ️  settings.py读取异常，使用默认配置（{e}）{NC}")
+        print(f"{YELLOW}ℹ️  settings.py读取异常（{e}），使用默认配置{NC}")
 
-    # 创建必要目录
+    # 创建必要目录（已有）
     for dir_path in [
         default_config["LOG_DIR"], default_config["CRON_BACKUP_DIR"],
         default_config["CSV_ROOT_DIR"], default_config["ARCHIVE_DIR"],
