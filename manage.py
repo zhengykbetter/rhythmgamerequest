@@ -43,6 +43,27 @@ def confirm_action(prompt: str) -> bool:
             return False
         else:
             print_color("❌ 输入无效，请输入 y/yes/是 或 n/no/否", "RED")
+# ========== 保留原有starter函数（无改动） ==========
+def starter():
+    """初始化：给脚本加执行权限 + 创建日志目录"""
+    print_color("===== 开始初始化脚本执行权限 =====", "YELLOW")
+    
+    # 1. 给核心脚本加权限（包含extract_song_data.py）
+    scripts = [
+        Path(__file__).absolute(),  # manage.py
+        MAIN_REPO_ROOT / "scripts" / "sync_csv_from_remote.py",
+        MAIN_REPO_ROOT / "scripts" / "extract_song_data.py",  # split_csv依赖的脚本
+        *list((MAIN_REPO_ROOT / "manager").glob("*.py"))
+    ]
+    for script in scripts:
+        if script.exists():
+            os.chmod(script, 0o755)
+            print_color(f"✅ 已给{script.name}赋予执行权限", "GREEN")
+    
+    # 2. 创建输出目录
+    os.makedirs(CSV_TARGET_DIR, exist_ok=True)
+    print_color(f"✅ 已创建CSV目标目录：{CSV_TARGET_DIR}", "GREEN")
+    print_color("===== 脚本权限初始化完成 =====\n", "GREEN")
 
 # ========== 新增：update-db指令处理函数 ==========
 def handle_update_db(*args):
@@ -246,27 +267,6 @@ def main():
     else:
         interactive_mode()
 
-# ========== 保留原有starter函数（无改动） ==========
-def starter():
-    """初始化：给脚本加执行权限 + 创建日志目录"""
-    print_color("===== 开始初始化脚本执行权限 =====", "YELLOW")
-    
-    # 1. 给核心脚本加权限（包含extract_song_data.py）
-    scripts = [
-        Path(__file__).absolute(),  # manage.py
-        MAIN_REPO_ROOT / "scripts" / "sync_csv_from_remote.py",
-        MAIN_REPO_ROOT / "scripts" / "extract_song_data.py",  # split_csv依赖的脚本
-        *list((MAIN_REPO_ROOT / "manager").glob("*.py"))
-    ]
-    for script in scripts:
-        if script.exists():
-            os.chmod(script, 0o755)
-            print_color(f"✅ 已给{script.name}赋予执行权限", "GREEN")
-    
-    # 2. 创建输出目录
-    os.makedirs(CSV_TARGET_DIR, exist_ok=True)
-    print_color(f"✅ 已创建CSV目标目录：{CSV_TARGET_DIR}", "GREEN")
-    print_color("===== 脚本权限初始化完成 =====\n", "GREEN")
 
 if __name__ == "__main__":
     main()
