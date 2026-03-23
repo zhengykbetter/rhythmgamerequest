@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 CSV文件管理模块（极简版：复用sync_csv_from_remote.py核心逻辑）
+新增：split_csv 函数 → 调用extract_song_data.py生成标准化CSV表
 """
 import os
 import sys
 import time
+import subprocess
 from pathlib import Path
 
 # ========== 基础配置：确保能导入sync_csv_from_remote.py ==========
@@ -14,7 +16,7 @@ sys.path.insert(0, str(MAIN_REPO_ROOT / "scripts"))  # 加入scripts目录到Pyt
 sys.path.insert(0, str(MAIN_REPO_ROOT))
 
 # 1. 导入统一颜色配置
-from config.settings import COLORS
+from config.settings import COLORS, CSV_TARGET_DIR
 # 2. 直接导入sync_csv_from_remote.py的核心函数（关键：复用所有逻辑）
 import sync_csv_from_remote as csv_sync
 
@@ -73,12 +75,56 @@ def clean_remote_csv():
         print_color(f"❌ 删除失败：{str(e)}", "RED")
         sys.exit(1)
 
+def split_csv():
+    """新增：调用extract_song_data.py，拆分原始CSV为多张标准化表"""
+    print_color("===== 开始执行split_csv：生成标准化CSV表 =====", "YELLOW")
+    start_time = time.time()
+    
+    # 1. 校验extract_song_data.py是否存在
+    extract_script = MAIN_REPO_ROOT / "scripts" / "extract_song_data.py"
+    if not extract_script.exists():
+        print_color(f"❌ 错误：提取脚本不存在 → {extract_script}", "RED")
+        print_color("⚠️  请确认extract_song_data.py放在scripts目录下", "YELLOW")
+        sys.exit(1)
+    
+    # 2. 确保输出目录存在
+    os.makedirs(CSV_TARGET_DIR, exist_ok=True)
+    
+    # 3. 调用外部脚本（捕获输出和错误）
+    try:
+        print_color(f"📝 正在执行：python {extract_script}", "GREEN")
+        # 执行脚本，实时输出日志
+        result = subprocess.run(
+            [sys.executable, str(extract_script)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding="utf-8",
+            cwd=str(MAIN_REPO_ROOT)  # 工作目录=主项目根
+        )
+        # 输出脚本执行结果
+        print(result.stdout)
+        
+        total_time = round((time.time() - start_time) * 1000, 2)
+        if result.returncode == 0:
+            print_color(f"✅ split_csv执行完成（总耗时{total_time}ms）", "GREEN")
+        else:
+            print_color(f"❌ split_csv执行失败（返回码：{result.returncode}，总耗时{total_time}ms）", "RED")
+            sys.exit(1)
+    except Exception as e:
+        total_time = round((time.time() - start_time) * 1000, 2)
+        print_color(f"❌ split_csv执行异常（总耗时{total_time}ms）：{str(e)}", "RED")
+        sys.exit(1)
+
 # ========== 测试入口（可选） ==========
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        command_map = {"sync-now": sync_now, "clean-remote-csv": clean_remote_csv}
+        command_map = {
+            "sync-now": sync_now,
+            "clean-remote-csv": clean_remote_csv,
+            "split_csv": split_csv  # 新增测试入口
+        }
         cmd = sys.argv[1]
         if cmd in command_map:
             command_map[cmd]()
         else:
-            print_color("未知命令：仅支持 sync-now / clean-remote-csv", "RED")
+            print_color("未知命令：仅支持 sync-now / clean-remote-csv / split_csv", "RED")
