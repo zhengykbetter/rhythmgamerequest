@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 # 🔥 修复核心：TABLE_RULES 在 scripts/csv_to_db 中！
-from scripts.csv_to_db import TABLE_RULES
+from scripts.csv_incremental_update import TABLE_RULES
 
 # 导入数据库查询
 from server.db_query import query_database
