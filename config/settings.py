@@ -65,3 +65,16 @@ COLORS = {
     "BOLD_RED": "\033[1;31m",
     "NC": "\033[0m"  # 重置颜色
 }
+
+# ===================== Web 部署配置（新增：网站运行核心配置） =====================
+# Web 应用入口目录（你要运行的 frontend/demo，后续改这里即可）
+WEB_APP_DIR = MAIN_REPO_ROOT / "frontend" / "demo"
+# Gunicorn 绑定地址（本地监听，安全）
+GUNICORN_BIND_HOST = "127.0.0.1"
+GUNICORN_BIND_PORT = 8000
+# Flask 应用入口（固定写法，无需修改）
+FLASK_APP_ENTRY = "app:app"
+# Gunicorn 工作进程数
+GUNICORN_WORKERS = 2
+# 项目日志目录
+WEB_LOG_DIR = LOG_DIR
