@@ -1,8 +1,9 @@
 from flask import Flask, render_template_string, request, jsonify
 import random
 import hashlib
-from datetime import date
+from datetime import date, datetime
 import os
+import json
 from pathlib import Path
 
 # 导入项目配置
@@ -17,6 +18,13 @@ app = Flask(__name__)
 BASE_DIR = Path(__file__).parent.parent
 LOG_PATH = BASE_DIR / "blogshow" / "update.log"
 COUNT_PATH = BASE_DIR / "blogshow" / "visit_count.txt"
+ISSUES_PATH = BASE_DIR.parent / "data_issues" / "issues.json"
+
+# 确保Issues目录存在
+os.makedirs(os.path.dirname(ISSUES_PATH), exist_ok=True)
+if not os.path.exists(ISSUES_PATH):
+    with open(ISSUES_PATH, "w", encoding="utf-8") as f:
+        json.dump([], f)
 
 # 加载日志
 with open(LOG_PATH, "r", encoding="utf-8") as f:
@@ -26,6 +34,29 @@ with open(LOG_PATH, "r", encoding="utf-8") as f:
 if not os.path.exists(COUNT_PATH):
     with open(COUNT_PATH, "w") as f:
         f.write("0")
+
+# ===================== Issues 数据操作 =====================
+def load_issues():
+    with open(ISSUES_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_issues(issues):
+    with open(ISSUES_PATH, "w", encoding="utf-8") as f:
+        json.dump(issues, f, ensure_ascii=False, indent=2)
+
+def add_issue(name, contact, content):
+    issues = load_issues()
+    new_issue = {
+        "id": len(issues) + 1,
+        "name": name,
+        "contact": contact,
+        "content": content,
+        "status": "待处理",
+        "create_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    issues.append(new_issue)
+    save_issues(issues)
+    return new_issue
 
 # ===================== 访问计数 =====================
 def get_visit_count():
@@ -69,6 +100,7 @@ def index():
                 min-height: 100vh;
                 padding: 20px;
                 color: #333;
+                padding-bottom: 100px;
             }
             .container {
                 max-width: 1200px;
@@ -144,23 +176,46 @@ def index():
                 margin-top: 30px;
                 display: none;
             }
+            .table-wrapper {
+                overflow-x: auto;
+                border-radius: 12px;
+                border: 1px solid #e0e0e0;
+                margin-top: 15px;
+            }
             .result-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin-top: 15px;
+                min-width: 800px;
             }
             .result-table th, .result-table td {
                 padding: 12px 15px;
                 text-align: left;
                 border-bottom: 1px solid #e0e0e0;
+                white-space: nowrap;
             }
             .result-table th {
                 background: #f5f5f5;
                 font-weight: 600;
                 color: #667eea;
+                position: sticky;
+                top: 0;
             }
             .result-table tr:hover {
                 background: #f9f9f9;
+            }
+            .table-wrapper::-webkit-scrollbar {
+                height: 10px;
+            }
+            .table-wrapper::-webkit-scrollbar-track {
+                background: #f1f1f1;
+                border-radius: 5px;
+            }
+            .table-wrapper::-webkit-scrollbar-thumb {
+                background: #667eea;
+                border-radius: 5px;
+            }
+            .table-wrapper::-webkit-scrollbar-thumb:hover {
+                background: #5a6fd6;
             }
             .loading {
                 text-align: center;
@@ -171,6 +226,13 @@ def index():
             .error {
                 background: #fff0f0;
                 color: #d32f2f;
+                padding: 15px;
+                border-radius: 8px;
+                margin-top: 15px;
+            }
+            .success {
+                background: #f0fff4;
+                color: #2e7d32;
                 padding: 15px;
                 border-radius: 8px;
                 margin-top: 15px;
@@ -226,6 +288,35 @@ def index():
                 cursor: pointer;
                 font-size: 0.9rem;
             }
+            /* 🔥 新增：Issues 底部入口 */
+            .issues-bar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: white;
+                padding: 15px 30px;
+                box-shadow: 0 -10px 30px rgba(0,0,0,0.1);
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                z-index: 100;
+            }
+            .issues-btn {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 12px 30px;
+                border-radius: 10px;
+                cursor: pointer;
+                font-size: 1rem;
+                font-weight: 600;
+                transition: all 0.3s;
+            }
+            .issues-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            }
             .modal {
                 display: none;
                 position: fixed;
@@ -245,9 +336,12 @@ def index():
                 padding: 40px;
                 border-radius: 20px;
                 width: 90%;
-                max-width: 700px;
+                max-width: 600px;
                 max-height: 80vh;
                 overflow-y: auto;
+            }
+            .modal-content.large {
+                max-width: 900px;
             }
             .close-btn {
                 position: absolute;
@@ -260,10 +354,91 @@ def index():
             .close-btn:hover {
                 color: #333;
             }
+            .form-group {
+                margin-bottom: 20px;
+            }
+            .form-group label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #667eea;
+            }
+            .form-group input, .form-group textarea {
+                width: 100%;
+                padding: 12px 15px;
+                border: 2px solid #e0e0e0;
+                border-radius: 10px;
+                font-size: 1rem;
+                outline: none;
+                transition: all 0.3s;
+            }
+            .form-group input:focus, .form-group textarea:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            }
+            .form-group textarea {
+                min-height: 120px;
+                resize: vertical;
+            }
+            .submit-btn {
+                width: 100%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 15px;
+                border-radius: 10px;
+                font-size: 1.1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+            .submit-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            }
+            .issue-card {
+                background: #f9f9f9;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 15px;
+                border-left: 4px solid #667eea;
+            }
+            .issue-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .issue-name {
+                font-weight: 600;
+                color: #667eea;
+                font-size: 1.1rem;
+            }
+            .issue-status {
+                padding: 4px 12px;
+                border-radius: 20px;
+                font-size: 0.85rem;
+                font-weight: 600;
+            }
+            .status-pending { background: #fff3cd; color: #856404; }
+            .status-processing { background: #cce5ff; color: #004085; }
+            .status-done { background: #d4edda; color: #155724; }
+            .issue-content {
+                margin: 10px 0;
+                line-height: 1.6;
+            }
+            .issue-meta {
+                color: #666;
+                font-size: 0.9rem;
+                margin-top: 10px;
+            }
             @media (max-width: 768px) {
                 .header h1 { font-size: 1.8rem; }
                 .main-card { padding: 20px; }
                 .version-box { position: static; margin-top: 20px; }
+                .issues-bar { padding: 10px; flex-direction: column; gap: 10px; }
+                .issues-btn { width: 100%; }
+                body { padding-bottom: 180px; }
             }
         </style>
     </head>
@@ -289,7 +464,9 @@ def index():
 
                 <div id="resultBox" class="result-box">
                     <div class="section-title">📊 查询结果</div>
-                    <table id="resultTable" class="result-table"></table>
+                    <div class="table-wrapper">
+                        <table id="resultTable" class="result-table"></table>
+                    </div>
                 </div>
 
                 <div class="info-row">
@@ -315,6 +492,45 @@ def index():
             <button class="blog-btn" onclick="showBlog()">更新日志</button>
         </div>
 
+        <!-- 🔥 新增：Issues 底部入口 -->
+        <div class="issues-bar">
+            <button class="issues-btn" onclick="showSubmitModal()">📝 提交 Issue</button>
+            <button class="issues-btn" onclick="showViewModal()">👀 查看 Issues</button>
+        </div>
+
+        <!-- 提交 Issue 弹窗 -->
+        <div id="submitModal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" onclick="closeSubmitModal()">×</span>
+                <h2 style="color:#667eea;margin-bottom:25px;">📝 提交 Issue</h2>
+                <div id="submitSuccess" class="success" style="display:none;">提交成功！感谢你的反馈！</div>
+                <div id="submitError" class="error" style="display:none;"></div>
+                <div class="form-group">
+                    <label>称呼</label>
+                    <input type="text" id="issueName" placeholder="请输入你的称呼">
+                </div>
+                <div class="form-group">
+                    <label>联系方式</label>
+                    <input type="text" id="issueContact" placeholder="邮箱/QQ/微信等（选填）">
+                </div>
+                <div class="form-group">
+                    <label>Issue 内容</label>
+                    <textarea id="issueContent" placeholder="请详细描述你的问题或建议..."></textarea>
+                </div>
+                <button class="submit-btn" onclick="submitIssue()">提交</button>
+            </div>
+        </div>
+
+        <!-- 查看 Issues 弹窗 -->
+        <div id="viewModal" class="modal">
+            <div class="modal-content large">
+                <span class="close-btn" onclick="closeViewModal()">×</span>
+                <h2 style="color:#667eea;margin-bottom:25px;">👀 所有 Issues</h2>
+                <div id="issuesList"></div>
+            </div>
+        </div>
+
+        <!-- 更新日志弹窗 -->
         <div id="blogModal" class="modal">
             <div class="modal-content">
                 <span class="close-btn" onclick="closeBlog()">×</span>
@@ -391,6 +607,96 @@ def index():
                 table.innerHTML = html;
             }
 
+            // Issues 功能
+            function showSubmitModal() {
+                document.getElementById("submitModal").style.display = "block";
+                document.getElementById("submitSuccess").style.display = "none";
+                document.getElementById("submitError").style.display = "none";
+                document.getElementById("issueName").value = "";
+                document.getElementById("issueContact").value = "";
+                document.getElementById("issueContent").value = "";
+            }
+            function closeSubmitModal() {
+                document.getElementById("submitModal").style.display = "none";
+            }
+
+            async function submitIssue() {
+                const name = document.getElementById("issueName").value.trim();
+                const contact = document.getElementById("issueContact").value.trim();
+                const content = document.getElementById("issueContent").value.trim();
+
+                if (!name || !content) {
+                    document.getElementById("submitError").innerText = "请填写称呼和内容！";
+                    document.getElementById("submitError").style.display = "block";
+                    return;
+                }
+
+                try {
+                    const response = await fetch("/api/issues/submit", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name, contact, content })
+                    });
+                    const data = await response.json();
+
+                    if (data.success) {
+                        document.getElementById("submitSuccess").style.display = "block";
+                        document.getElementById("submitError").style.display = "none";
+                        setTimeout(closeSubmitModal, 2000);
+                    } else {
+                        document.getElementById("submitError").innerText = data.error;
+                        document.getElementById("submitError").style.display = "block";
+                    }
+                } catch (e) {
+                    document.getElementById("submitError").innerText = "提交失败：" + e.message;
+                    document.getElementById("submitError").style.display = "block";
+                }
+            }
+
+            async function showViewModal() {
+                document.getElementById("viewModal").style.display = "block";
+                try {
+                    const response = await fetch("/api/issues/list");
+                    const data = await response.json();
+                    renderIssues(data.data);
+                } catch (e) {
+                    document.getElementById("issuesList").innerHTML = "<div class='error'>加载失败：" + e.message + "</div>";
+                }
+            }
+            function closeViewModal() {
+                document.getElementById("viewModal").style.display = "none";
+            }
+
+            function renderIssues(issues) {
+                const container = document.getElementById("issuesList");
+                if (!issues || issues.length === 0) {
+                    container.innerHTML = "<p style='text-align:center;color:#666;'>暂无 Issues</p>";
+                    return;
+                }
+
+                let html = "";
+                issues.reverse().forEach(issue => {
+                    let statusClass = "status-pending";
+                    if (issue.status === "处理中") statusClass = "status-processing";
+                    if (issue.status === "已解决") statusClass = "status-done";
+
+                    html += `
+                        <div class="issue-card">
+                            <div class="issue-header">
+                                <span class="issue-name">${issue.name}</span>
+                                <span class="issue-status ${statusClass}">${issue.status}</span>
+                            </div>
+                            <div class="issue-content">${issue.content}</div>
+                            <div class="issue-meta">
+                                📅 ${issue.create_time}
+                                ${issue.contact ? ` | 📞 ${issue.contact}` : ""}
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+
             function showBlog() {
                 document.getElementById("blogModal").style.display = "block";
             }
@@ -399,6 +705,8 @@ def index():
             }
             window.onclick = function(event) {
                 if (event.target == document.getElementById("blogModal")) closeBlog();
+                if (event.target == document.getElementById("submitModal")) closeSubmitModal();
+                if (event.target == document.getElementById("viewModal")) closeViewModal();
             }
 
             document.getElementById("queryInput").addEventListener("keypress", function(e) {
@@ -416,7 +724,7 @@ def index():
         visit_count=visit_count
     )
 
-# ===================== 🔥 新增：LLM查询API接口 =====================
+# ===================== LLM查询API接口 =====================
 @app.route('/api/query', methods=['POST'])
 def api_query():
     try:
@@ -433,6 +741,33 @@ def api_query():
     
     except Exception as e:
         return jsonify({"error": str(e)})
+
+# ===================== Issues API接口 =====================
+@app.route('/api/issues/submit', methods=['POST'])
+def submit_issue_api():
+    try:
+        data = request.get_json()
+        name = data.get("name", "")
+        contact = data.get("contact", "")
+        content = data.get("content", "")
+        
+        if not name or not content:
+            return jsonify({"success": False, "error": "请填写称呼和内容"})
+        
+        add_issue(name, contact, content)
+        return jsonify({"success": True})
+    
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/issues/list', methods=['GET'])
+def list_issues_api():
+    try:
+        issues = load_issues()
+        return jsonify({"data": issues})
+    
+    except Exception as e:
+        return jsonify({"data": [], "error": str(e)})
 
 if __name__ == '__main__':
     app.run()
