@@ -4,11 +4,15 @@
 数据库连接工具（复刻原版，100%兼容现有配置）
 """
 import os
+import sys
+# 🔥 修复：自动添加项目根目录到Python路径
+MAIN_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, MAIN_PROJECT_ROOT)
+
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 
-# 加载项目根路径
-MAIN_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 加载环境变量
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))
 
 # 导入项目数据库配置

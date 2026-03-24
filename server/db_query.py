@@ -4,8 +4,15 @@
 数据库查询核心模块
 仅支持只读查询，返回格式化结果 + 终端输出
 """
+import os
+import sys
+# 🔥 修复：自动添加项目根目录到Python路径
+MAIN_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, MAIN_PROJECT_ROOT)
+
 from sqlalchemy import text
-from server.db import get_mysql_engine
+# 🔥 修复：直接相对导入
+from db import get_mysql_engine
 
 def query_database(sql: str, params: dict = None):
     """
@@ -40,7 +47,7 @@ def query_database(sql: str, params: dict = None):
 
             print(f"[✅ 查询成功] 共返回 {len(result_list)} 条数据")
             print("[📊 结果预览]")
-            for idx, item in enumerate(result_list[:5]):  # 只打印前5条
+            for idx, item in enumerate(result_list[:5]):
                 print(f"  {idx+1}. {item}")
             if len(result_list) > 5:
                 print(f"  ... 共 {len(result_list)} 条")
@@ -52,12 +59,7 @@ def query_database(sql: str, params: dict = None):
         print(f"[❌ 查询失败] 错误信息：{str(e)}")
         return []
 
-# 测试用例（直接运行此文件可测试）
+# 测试用例
 if __name__ == "__main__":
-    # 测试1：查询所有游戏
     test_sql = "SELECT 游戏编号, 游戏 FROM game_info LIMIT 5;"
     query_database(test_sql)
-
-    # 测试2：查询所有歌曲
-    # test_sql2 = "SELECT song_id, 歌名 FROM song_info LIMIT 5;"
-    # query_database(test_sql2)
