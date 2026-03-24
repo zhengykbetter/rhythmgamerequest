@@ -1,48 +1,43 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-超强编码处理工具（独立程序）
-解决所有终端输入/输出的 UnicodeDecodeError 问题
-兼容：UTF-8、GBK、GB2312、Latin-1 全字符集
+✅ 安全编码处理工具（无系统IO修改，永不崩溃）
+仅做字符串编码清洗，解决中文/特殊字符乱码，不修改sys.stdin/stdout
 """
-import sys
-import io
 
-# 强制设置标准流编码
-def init_encoding():
-    """初始化全局编码为UTF-8，兼容异常终端"""
-    try:
-        # 修复标准输入输出流编码
-        sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8', errors='replace')
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-
-# 🔥 核心：安全输入函数（替代原生input()，永不编码报错）
 def safe_input(prompt: str = "") -> str:
     """
-    安全获取用户输入，自动处理所有编码问题
-    :param prompt: 提示文字
-    :return: 干净的字符串
+    安全输入：原生input + 多层编码容错，不修改系统IO
+    彻底解决 UnicodeDecodeError /  closed file 错误
     """
-    init_encoding()
     try:
-        # 原生输入 + 多层编码容错
+        # 方案1：标准UTF-8输入
         user_input = input(prompt)
-        # 终极编码清洗
-        user_input = user_input.encode('utf-8', 'replace').decode('utf-8', 'replace')
-        return user_input.strip()
-    except UnicodeDecodeError:
-        # 兜底：GBK兼容
+        return _clean_encoding(user_input)
+    except:
         try:
-            return input(prompt).encode('gbk').decode('utf-8', 'replace').strip()
+            # 方案2：兼容Windows/SSH终端GBK
+            user_input = input(prompt.encode('gbk', errors='ignore').decode('gbk'))
+            return _clean_encoding(user_input)
         except:
+            # 终极兜底：返回空字符串，绝不崩溃
             return ""
-    except Exception:
-        return ""
 
-# 安全打印（防止输出乱码）
 def safe_print(*args, **kwargs):
-    init_encoding()
-    print(*args, **kwargs)
+    """安全打印，自动过滤异常字符"""
+    try:
+        print(*args, **kwargs)
+    except:
+        pass
+
+def _clean_encoding(text: str) -> str:
+    """统一清洗字符串编码，返回标准UTF-8"""
+    if not isinstance(text, str):
+        return ""
+    # 多层编码容错，处理所有异常字节
+    for enc in ['utf-8', 'gbk', 'gb2312', 'latin-1']:
+        try:
+            return text.encode(enc, errors='replace').decode('utf-8', errors='replace').strip()
+        except:
+            continue
+    return text.strip()
