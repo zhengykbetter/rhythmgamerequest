@@ -3,6 +3,7 @@
 1. 前后端打通
 2. 公开项目地址
 3. issues通道
+4. 游戏列表更新
 
 2025-03-24 v0.1.2
 1. 新增访客数统计
@@ -18,3 +19,22 @@
 1. 上线今日运势功能
 2. 部署Gunicorn
 3. 夹带私货
+
+开源项目地址：
+https://github.com/zhengykbetter/rhythmgamerequest/tree/stable-5c644b7
+
+预计更新的游戏列表：
+A——phi、para、orz、rot、riz
+B——Sega3机台、Arc
+C——Bof、osu段位
+D——iidx ub sdvx ddr
+E——gc、wacca、SEVEN's CODE、v/s
+F——lanota、overrapid、Takumi、musedash、DJMAX V RESPECT、music diver
+G——Notanote、ryceam、berry、milthm、musync、shinobi、liminarity、polytone、noisz 
+H——cytus、deemo、kalpa、dy、舞立方
+I——Osu各大比赛
+J——太鼓、节奏大师（部分）
+可待补充
+
+短期内不会加入到游戏列表中的游戏：
+Undertale、pjsk、bang系列、lovelive系列、d4dj、wds
