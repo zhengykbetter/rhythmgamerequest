@@ -1,0 +1,2 @@
+git fetch origin stable-5c644b7 && git reset --hard origin/stable-5c644b7
+git add . && git commit -m "网络更新" && git push origin HEAD:stable-5c644b7
