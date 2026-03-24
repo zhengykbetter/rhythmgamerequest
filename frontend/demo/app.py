@@ -1,14 +1,15 @@
-from flask import Flask, render_template_string, request
+from flask import Flask, render_template_string, request, jsonify
 import random
 import hashlib
 from datetime import date
 import os
 from pathlib import Path
 
-# 导入配置
+# 导入项目配置
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from config.version import APP_VERSION
+from server.llm_service import llm_query
 
 app = Flask(__name__)
 
@@ -21,30 +22,26 @@ COUNT_PATH = BASE_DIR / "blogshow" / "visit_count.txt"
 with open(LOG_PATH, "r", encoding="utf-8") as f:
     UPDATE_BLOG = f.read()
 
-# 初始化访问计数文件
+# 初始化访问计数
 if not os.path.exists(COUNT_PATH):
     with open(COUNT_PATH, "w") as f:
         f.write("0")
 
-# ===================== 访问计数函数 =====================
+# ===================== 访问计数 =====================
 def get_visit_count():
     with open(COUNT_PATH, "r") as f:
         count = int(f.read().strip())
-    # 访问自增
     count += 1
     with open(COUNT_PATH, "w") as f:
         f.write(str(count))
     return count
 
-# ===================== 固定运势算法（同日同用户不变） =====================
+# ===================== 固定运势算法 =====================
 def get_luck(ip):
-    # 组合：用户IP + 当天日期 → 生成唯一标识
     today = str(date.today())
     unique_key = f"{ip}_{today}"
-    # 哈希转数字
     hash_obj = hashlib.md5(unique_key.encode())
     hash_num = int(hash_obj.hexdigest(), 16)
-    # 80% 100分，20% 10分，结果永久固定
     if hash_num % 10 < 8:
         return "恭喜你，你的运势是100分"
     else:
@@ -53,11 +50,8 @@ def get_luck(ip):
 # ===================== 页面路由 =====================
 @app.route('/')
 def index():
-    # 获取用户IP
     user_ip = request.remote_addr
-    # 固定运势
     luck_result = get_luck(user_ip)
-    # 访问人次
     visit_count = get_visit_count()
     
     html = '''
@@ -66,48 +60,172 @@ def index():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>RhythmGameQuery</title>
+        <title>RhythmGameQuery - 音游数据智能查询</title>
         <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
             body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+                color: #333;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .header {
                 text-align: center;
-                margin-top: 50px;
-                font-size: 20px;
-                background: #f5f5f5;
-            }
-            button {
-                padding: 10px 20px;
-                font-size: 18px;
-                cursor: pointer;
-                margin: 20px;
-                border-radius: 8px;
-                border: none;
-                background: #4285F4;
                 color: white;
+                margin-bottom: 30px;
             }
-            .info-box {
-                margin: 20px auto;
-                font-size: 16px;
-                color: #555;
-                line-height: 1.8;
+            .header h1 {
+                font-size: 2.5rem;
+                margin-bottom: 10px;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.2);
             }
-            /* 右下角悬浮版本号 */
+            .header p {
+                font-size: 1.1rem;
+                opacity: 0.9;
+            }
+            .main-card {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                padding: 40px;
+                margin-bottom: 20px;
+            }
+            .section-title {
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin-bottom: 20px;
+                color: #667eea;
+                border-left: 4px solid #667eea;
+                padding-left: 15px;
+            }
+            .query-box {
+                margin-bottom: 30px;
+            }
+            .query-input {
+                width: 100%;
+                padding: 15px 20px;
+                font-size: 1.1rem;
+                border: 2px solid #e0e0e0;
+                border-radius: 12px;
+                outline: none;
+                transition: all 0.3s;
+                margin-bottom: 15px;
+            }
+            .query-input:focus {
+                border-color: #667eea;
+                box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            }
+            .query-btn {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 15px 40px;
+                font-size: 1.1rem;
+                border-radius: 12px;
+                cursor: pointer;
+                transition: all 0.3s;
+                font-weight: 600;
+            }
+            .query-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            }
+            .query-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+                transform: none;
+            }
+            .result-box {
+                margin-top: 30px;
+                display: none;
+            }
+            .result-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+            }
+            .result-table th, .result-table td {
+                padding: 12px 15px;
+                text-align: left;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            .result-table th {
+                background: #f5f5f5;
+                font-weight: 600;
+                color: #667eea;
+            }
+            .result-table tr:hover {
+                background: #f9f9f9;
+            }
+            .loading {
+                text-align: center;
+                padding: 30px;
+                color: #667eea;
+                font-size: 1.1rem;
+            }
+            .error {
+                background: #fff0f0;
+                color: #d32f2f;
+                padding: 15px;
+                border-radius: 8px;
+                margin-top: 15px;
+            }
+            .info-row {
+                display: flex;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 20px;
+                margin-top: 30px;
+                padding-top: 30px;
+                border-top: 1px solid #e0e0e0;
+            }
+            .info-card {
+                flex: 1;
+                min-width: 200px;
+                background: #f5f5f5;
+                padding: 20px;
+                border-radius: 12px;
+                text-align: center;
+            }
+            .info-card h3 {
+                font-size: 1.2rem;
+                margin-bottom: 10px;
+                color: #667eea;
+            }
+            .info-card p {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: #333;
+            }
             .version-box {
                 position: fixed;
                 right: 30px;
                 bottom: 30px;
-                text-align: center;
                 background: white;
-                padding: 15px 25px;
-                border-radius: 12px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                min-width: 180px;
+                padding: 20px 30px;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                text-align: center;
             }
             .version-text {
-                font-size: 16px;
+                font-size: 1rem;
                 color: #666;
-                margin-bottom: 15px;
+                margin-bottom: 10px;
             }
-            /* 弹窗 */
+            .blog-btn {
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 8px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 0.9rem;
+            }
             .modal {
                 display: none;
                 position: fixed;
@@ -124,71 +242,155 @@ def index():
                 left: 50%;
                 transform: translate(-50%, -50%);
                 background: white;
-                padding: 30px;
-                border-radius: 12px;
-                width: 80%;
-                max-width: 600px;
-                max-height: 70vh;
+                padding: 40px;
+                border-radius: 20px;
+                width: 90%;
+                max-width: 700px;
+                max-height: 80vh;
                 overflow-y: auto;
-                text-align: left;
-                white-space: pre-line;
             }
             .close-btn {
                 position: absolute;
-                right: 15px;
-                top: 15px;
-                font-size: 20px;
+                right: 20px;
+                top: 20px;
+                font-size: 2rem;
                 cursor: pointer;
-                background: none;
+                color: #999;
+            }
+            .close-btn:hover {
                 color: #333;
+            }
+            @media (max-width: 768px) {
+                .header h1 { font-size: 1.8rem; }
+                .main-card { padding: 20px; }
+                .version-box { position: static; margin-top: 20px; }
             }
         </style>
     </head>
     <body>
-        <h1>✅ 少女正在施工中，thinking...</h1>
-        
-        <button onclick="showLuck()">今日运势</button>
-        <p id="result"></p>
+        <div class="container">
+            <div class="header">
+                <h1>🎮 RhythmGameQuery</h1>
+                <p>少女正在施工中，thinking...</p>
+            </div>
 
-        <!-- 新增：本地时间 + 访问人次 -->
-        <div class="info-box">
-            <div>🖥️ 本地时间：<span id="local-time"></span></div>
-            <div>👀 累计访问：{{ visit_count }} 人次</div>
+            <div class="main-card">
+                <div class="section-title">🔍 智能数据查询</div>
+                <div class="query-box">
+                    <input type="text" id="queryInput" class="query-input" placeholder="请输入自然语言查询，例如：查询所有游戏名称 / 查询Phigros的歌曲">
+                    <button id="queryBtn" class="query-btn" onclick="executeQuery()">开始查询</button>
+                </div>
+
+                <div id="loading" class="loading" style="display:none;">
+                    正在查询中，请稍候...
+                </div>
+
+                <div id="error" class="error" style="display:none;"></div>
+
+                <div id="resultBox" class="result-box">
+                    <div class="section-title">📊 查询结果</div>
+                    <table id="resultTable" class="result-table"></table>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-card">
+                        <h3>今日运势</h3>
+                        <button onclick="showLuck()" style="background:#667eea;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">查看运势</button>
+                        <p id="luckResult" style="font-size:1rem;margin-top:10px;"></p>
+                    </div>
+                    <div class="info-card">
+                        <h3>本地时间</h3>
+                        <p id="localTime" style="font-size:1.2rem;"></p>
+                    </div>
+                    <div class="info-card">
+                        <h3>累计访问</h3>
+                        <p>{{ visit_count }} 人次</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- 右下角版本号 -->
         <div class="version-box">
             <div class="version-text">版本：{{ version }}</div>
-            <button onclick="showBlog()">更新日志</button>
+            <button class="blog-btn" onclick="showBlog()">更新日志</button>
         </div>
 
-        <!-- 日志弹窗 -->
         <div id="blogModal" class="modal">
             <div class="modal-content">
-                <button class="close-btn" onclick="closeBlog()">×</button>
-                <h3>📝 更新日志</h3>
-                <div>{{ blog }}</div>
+                <span class="close-btn" onclick="closeBlog()">×</span>
+                <h2 style="color:#667eea;margin-bottom:20px;">📝 更新日志</h2>
+                <pre style="white-space:pre-line;line-height:1.8;font-size:1rem;">{{ blog }}</pre>
             </div>
         </div>
 
         <script>
-            // 后端固定好的运势结果
             const LUCK_RESULT = "{{ luck_result }}";
             
-            // 显示运势（结果固定）
             function showLuck() {
-                document.getElementById("result").innerText = LUCK_RESULT;
+                document.getElementById("luckResult").innerText = LUCK_RESULT;
             }
 
-            // 实时本地时间
             function updateTime() {
                 const now = new Date();
-                document.getElementById("local-time").innerText = now.toLocaleString();
+                document.getElementById("localTime").innerText = now.toLocaleString();
             }
             setInterval(updateTime, 1000);
             updateTime();
 
-            // 弹窗控制
+            async function executeQuery() {
+                const query = document.getElementById("queryInput").value.trim();
+                if (!query) {
+                    alert("请输入查询内容！");
+                    return;
+                }
+
+                document.getElementById("loading").style.display = "block";
+                document.getElementById("resultBox").style.display = "none";
+                document.getElementById("error").style.display = "none";
+                document.getElementById("queryBtn").disabled = true;
+
+                try {
+                    const response = await fetch("/api/query", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ query: query })
+                    });
+                    const data = await response.json();
+
+                    if (data.error) {
+                        document.getElementById("error").innerText = data.error;
+                        document.getElementById("error").style.display = "block";
+                    } else if (data.data && data.data.length > 0) {
+                        renderTable(data.data);
+                        document.getElementById("resultBox").style.display = "block";
+                    } else {
+                        document.getElementById("error").innerText = "未查询到数据";
+                        document.getElementById("error").style.display = "block";
+                    }
+                } catch (e) {
+                    document.getElementById("error").innerText = "查询失败：" + e.message;
+                    document.getElementById("error").style.display = "block";
+                } finally {
+                    document.getElementById("loading").style.display = "none";
+                    document.getElementById("queryBtn").disabled = false;
+                }
+            }
+
+            function renderTable(data) {
+                const table = document.getElementById("resultTable");
+                const headers = Object.keys(data[0]);
+                let html = "<thead><tr>";
+                headers.forEach(h => html += `<th>${h}</th>`);
+                html += "</tr></thead><tbody>";
+                data.forEach(row => {
+                    html += "<tr>";
+                    headers.forEach(h => html += `<td>${row[h] || ""}</td>`);
+                    html += "</tr>";
+                });
+                html += "</tbody>";
+                table.innerHTML = html;
+            }
+
             function showBlog() {
                 document.getElementById("blogModal").style.display = "block";
             }
@@ -196,9 +398,12 @@ def index():
                 document.getElementById("blogModal").style.display = "none";
             }
             window.onclick = function(event) {
-                let modal = document.getElementById("blogModal");
-                if (event.target == modal) modal.style.display = "none";
+                if (event.target == document.getElementById("blogModal")) closeBlog();
             }
+
+            document.getElementById("queryInput").addEventListener("keypress", function(e) {
+                if (e.key === "Enter") executeQuery();
+            });
         </script>
     </body>
     </html>
@@ -210,6 +415,24 @@ def index():
         luck_result=luck_result,
         visit_count=visit_count
     )
+
+# ===================== 🔥 新增：LLM查询API接口 =====================
+@app.route('/api/query', methods=['POST'])
+def api_query():
+    try:
+        data = request.get_json()
+        user_query = data.get("query", "")
+        
+        if not user_query:
+            return jsonify({"error": "请输入查询内容"})
+        
+        # 调用LLM查询服务
+        result = llm_query(user_query)
+        
+        return jsonify({"data": result})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
     app.run()
