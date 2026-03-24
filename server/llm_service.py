@@ -3,7 +3,7 @@
 """
 LLM 自然语言转SQL服务（安全版）
 1. 从.env加载API配置
-2. 自动读取TABLE_RULES表结构
+2. 从csv_to_db读取TABLE_RULES表结构
 3. 严格SQL安全校验
 4. 仅支持只读查询
 """
@@ -16,8 +16,10 @@ sys.path.insert(0, MAIN_PROJECT_ROOT)
 
 from dotenv import load_dotenv
 from openai import OpenAI
-# 导入项目配置
-from config.settings import TABLE_RULES
+
+# 🔥 修复核心：TABLE_RULES 在 scripts/csv_to_db 中！
+from scripts.csv_to_db import TABLE_RULES
+
 # 导入数据库查询
 from server.db_query import query_database
 
