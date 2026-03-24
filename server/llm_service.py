@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LLM 自然语言转SQL服务（安全版 + 交互式手动输入）
-1. 从.env加载API配置
-2. 从 csv_incremental_update 读取 TABLE_RULES 表结构
-3. 严格SQL安全校验
-4. 仅支持只读查询
-5. 手动输入自然语言，自由查询
+LLM 自然语言转SQL服务（安全版 + 交互式手动输入 + 万能编码）
 """
 import os
 import sys
@@ -19,15 +14,16 @@ sys.path.insert(0, MAIN_PROJECT_ROOT)
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# 导入你的表结构配置
+# 导入编码处理工具（独立程序）
+from server.encoding_utils import safe_input, safe_print
+# 导入表结构 + 查询
 from scripts.csv_incremental_update import TABLE_RULES
-# 导入数据库查询
 from server.db_query import query_database
 
 # 加载环境变量
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))
 
-# ===================== LLM 配置（从.env读取，绝不硬编码） =====================
+# ===================== LLM 配置 =====================
 LLM_CONFIG = {
     "api_key": os.getenv("LLM_API_KEY", ""),
     "base_url": os.getenv("LLM_BASE_URL", ""),
@@ -35,13 +31,9 @@ LLM_CONFIG = {
     "temperature": float(os.getenv("LLM_TEMPERATURE", 0.1)),
 }
 
-# 初始化LLM客户端
-client = OpenAI(
-    api_key=LLM_CONFIG["api_key"],
-    base_url=LLM_CONFIG["base_url"]
-)
+client = OpenAI(api_key=LLM_CONFIG["api_key"], base_url=LLM_CONFIG["base_url"])
 
-# ===================== 自动生成表结构提示词 =====================
+# ===================== 表结构提示词 =====================
 def get_table_schema_prompt():
     table_names = [t for t in TABLE_RULES["create_order"]]
     schema_prompt = "数据库表结构如下（仅允许查询这些表）：\n"
@@ -59,12 +51,12 @@ def validate_sql_safety(sql: str) -> bool:
     sql_upper = sql.strip().upper()
     allowed_tables = [t.upper() for t in TABLE_RULES["create_order"]]
     if not sql_upper.startswith("SELECT"):
-        print("[❌ 拦截] 仅允许查询语句")
+        safe_print("[❌ 拦截] 仅允许查询语句")
         return False
     dangerous_keywords = ["DROP", "DELETE", "UPDATE", "INSERT", "ALTER", "TRUNCATE", "CREATE"]
     for keyword in dangerous_keywords:
         if keyword in sql_upper:
-            print(f"[❌ 拦截] 禁止危险操作：{keyword}")
+            safe_print(f"[❌ 拦截] 禁止危险操作：{keyword}")
             return False
     table_found = False
     for table in allowed_tables:
@@ -72,35 +64,32 @@ def validate_sql_safety(sql: str) -> bool:
             table_found = True
             break
     if not table_found:
-        print("[❌ 拦截] 禁止使用未授权数据表")
+        safe_print("[❌ 拦截] 禁止使用未授权数据表")
         return False
     return True
 
 # ===================== 自然语言转SQL =====================
 def nl_to_sql(natural_query: str) -> str:
     if not LLM_CONFIG["api_key"]:
-        print("[❌ 错误] 请在.env配置LLM_API_KEY")
+        safe_print("[❌ 错误] 请在.env配置LLM_API_KEY")
         return ""
     system_prompt = get_table_schema_prompt()
     try:
         response = client.chat.completions.create(
             model=LLM_CONFIG["model"],
             temperature=LLM_CONFIG["temperature"],
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": natural_query}
-            ]
+            messages=[{"role": "system", "content": system_prompt},{"role": "user", "content": natural_query}]
         )
         sql = response.choices[0].message.content.strip()
         sql = re.sub(r"```sql|```", "", sql).strip()
         return sql
     except Exception as e:
-        print(f"[❌ LLM调用失败：{str(e)}]")
+        safe_print(f"[❌ LLM调用失败：{str(e)}]")
         return ""
 
 # ===================== 全流程查询 =====================
 def llm_query(natural_query: str):
-    print(f"\n[🔍 你的查询] {natural_query}")
+    safe_print(f"\n[🔍 你的查询] {natural_query}")
     sql = nl_to_sql(natural_query)
     if not sql:
         return []
@@ -108,20 +97,20 @@ def llm_query(natural_query: str):
         return []
     return query_database(sql)
 
-# ===================== 🔥 交互式手动输入模式（你要的功能） =====================
+# ===================== 交互式主程序 =====================
 if __name__ == "__main__":
-    print("=" * 60)
-    print("🎯 LLM 自然语言查询数据库（输入 exit 退出）")
-    print("📌 示例：查询所有游戏名称 | 查询Phigros的歌曲")
-    print("=" * 60)
+    safe_print("=" * 60)
+    safe_print("🎯 LLM 自然语言查询数据库（输入 exit 退出）")
+    safe_print("📌 示例：查询所有游戏名称 | 查询Phigros的歌曲")
+    safe_print("=" * 60)
     
     while True:
-        user_input = input("\n请输入你的查询：").strip()
+        # 🔥 使用安全输入，永不编码报错
+        user_input = safe_input("\n请输入你的查询：")
         if user_input.lower() in ["exit", "quit", "退出"]:
-            print("👋 退出查询！")
+            safe_print("👋 退出查询！")
             break
         if not user_input:
-            print("⚠️ 请输入有效内容！")
+            safe_print("⚠️ 请输入有效内容！")
             continue
-        # 执行查询
         llm_query(user_input)
