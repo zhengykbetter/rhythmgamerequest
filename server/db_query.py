@@ -61,5 +61,5 @@ def query_database(sql: str, params: dict = None):
 
 # 测试用例
 if __name__ == "__main__":
-    test_sql = "SELECT 游戏编号, 游戏 FROM game_info LIMIT 5;"
-    query_database(test_sql)
+    test_sql2 = "SELECT song_id, 歌名 FROM song_info LIMIT 5;"
+    query_database(test_sql2)
