@@ -45,12 +45,8 @@ def get_table_schema_prompt():
     schema_prompt += "\n规则：\n1. 仅生成SELECT查询语句，禁止任何增删改\n2. 仅使用上述表和字段\n3. 返回纯SQL，不要任何解释\n4. 字段名必须严格匹配"
     return schema_prompt
 
-# ===================== 🔥 修复：安全拦截（全词匹配+详细日志） =====================
+# ===================== 安全拦截（全词匹配+详细日志） =====================
 def validate_sql_safety(sql: str) -> bool:
-    """
-    安全校验：仅允许SELECT查询，危险操作详细日志，拦截后不执行
-    返回 True=安全 | False=拦截
-    """
     if not sql:
         return False
 
@@ -58,14 +54,12 @@ def validate_sql_safety(sql: str) -> bool:
     allowed_tables = [t.upper() for t in TABLE_RULES["create_order"]]
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # 1. 仅允许SELECT开头（严格匹配）
     if not sql_upper.startswith("SELECT"):
         safe_print(f"\n[🚨 拦截日志 {now}]")
         safe_print(f"[拦截原因] 非查询语句，仅支持SELECT查询")
         safe_print(f"[违规SQL] {sql}")
         return False
 
-    # 2. 危险SQL关键字（全词正则匹配，永不误拦截子串）
     dangerous_keywords = [
         r"\bDROP\b", r"\bDELETE\b", r"\bUPDATE\b", r"\bINSERT\b",
         r"\bALTER\b", r"\bTRUNCATE\b", r"\bCREATE\b", r"\bGRANT\b"
@@ -80,20 +74,13 @@ def validate_sql_safety(sql: str) -> bool:
             safe_print(f"[处理结果] 已拦截，未执行任何数据库操作")
             return False
 
-    # 3. 仅允许使用业务白名单表
-    table_found = False
     for table in allowed_tables:
         if re.search(r"\bFROM\s+"+table+r"\b", sql_upper) or re.search(r"\bJOIN\s+"+table+r"\b", sql_upper):
-            table_found = True
-            break
-    if not table_found:
-        safe_print(f"\n[🚨 拦截日志 {now}]")
-        safe_print(f"[拦截原因] 使用了未授权的数据表")
-        safe_print(f"[违规SQL] {sql}")
-        return False
-
-    # 安全通过
-    return True
+            return True
+    safe_print(f"\n[🚨 拦截日志 {now}]")
+    safe_print(f"[拦截原因] 使用了未授权的数据表")
+    safe_print(f"[违规SQL] {sql}")
+    return False
 
 # ===================== 自然语言转SQL =====================
 def nl_to_sql(natural_query: str) -> str:
@@ -122,18 +109,15 @@ def llm_query(q: str):
         safe_print("[ℹ️] LLM未生成有效SQL")
         return []
     
-    # 安全校验（拦截则不执行）
     if not validate_sql_safety(sql):
         return []
     
-    # 校验通过 → 执行查询
     return query_database(sql)
 
 # ===================== 主程序 =====================
 if __name__ == "__main__":
     safe_print("=" * 60)
     safe_print("🎯 LLM自然语言查询数据库（输入 exit 退出）")
-    safe_print("📌 支持：查询Phigros歌曲 | 查询所有游戏 | 模糊查询")
     safe_print("=" * 60)
     
     while True:
@@ -145,4 +129,3 @@ if __name__ == "__main__":
             safe_print("⚠️ 请输入有效内容")
             continue
         llm_query(user_q)
-EOF

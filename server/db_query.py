@@ -11,8 +11,8 @@ MAIN_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, MAIN_PROJECT_ROOT)
 
 from sqlalchemy import text
-# 🔥 修复：直接相对导入
-from db import get_mysql_engine
+# 🔥 修复：正确导入 db.py
+from server.db import get_mysql_engine
 
 def query_database(sql: str, params: dict = None):
     """
@@ -61,5 +61,5 @@ def query_database(sql: str, params: dict = None):
 
 # 测试用例
 if __name__ == "__main__":
-    test_sql2 = "SELECT song_id, 歌名 FROM song_info LIMIT 5;"
-    query_database(test_sql2)
+    test_sql = "SELECT 游戏编号, 游戏 FROM game_info LIMIT 5;"
+    query_database(test_sql)
