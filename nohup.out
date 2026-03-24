@@ -1,0 +1,57 @@
+[2026-03-24 11:02:59 +0800] [2843898] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 11:02:59 +0800] [2843898] [INFO] Listening at: http://127.0.0.1:8000 (2843898)
+[2026-03-24 11:02:59 +0800] [2843898] [INFO] Using worker: sync
+[2026-03-24 11:02:59 +0800] [2843898] [INFO] Control socket listening at /opt/main_project/gunicorn.ctl
+[2026-03-24 11:02:59 +0800] [2843900] [INFO] Booting worker with pid: 2843900
+[2026-03-24 11:02:59 +0800] [2843901] [INFO] Booting worker with pid: 2843901
+[2026-03-24 11:20:26 +0800] [2843901] [INFO] Worker exiting (pid: 2843901)
+[2026-03-24 11:20:26 +0800] [2843900] [INFO] Worker exiting (pid: 2843900)
+[2026-03-24 11:20:26 +0800] [2843898] [INFO] Handling signal: term
+[2026-03-24 11:20:26 +0800] [2843898] [INFO] Worker (pid:2843900) was sent SIGTERM!
+[2026-03-24 11:20:26 +0800] [2843898] [INFO] Worker (pid:2843901) was sent SIGTERM!
+[2026-03-24 11:20:26 +0800] [2843898] [INFO] Shutting down: Master
+[2026-03-24 11:45:47 +0800] [2859500] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 11:45:47 +0800] [2859500] [INFO] Listening at: http://0.0.0.0:80 (2859500)
+[2026-03-24 11:45:47 +0800] [2859500] [INFO] Using worker: sync
+[2026-03-24 11:45:47 +0800] [2859500] [INFO] Control socket listening at /opt/main_project/gunicorn.ctl
+[2026-03-24 11:45:47 +0800] [2859503] [INFO] Booting worker with pid: 2859503
+[2026-03-24 11:51:02 +0800] [2859500] [INFO] Handling signal: term
+[2026-03-24 11:51:02 +0800] [2859503] [INFO] Worker exiting (pid: 2859503)
+[2026-03-24 11:51:02 +0800] [2859500] [INFO] Worker (pid:2859503) was sent SIGTERM!
+[2026-03-24 11:51:32 +0800] [2859500] [INFO] Shutting down: Master
+[2026-03-24 13:11:40 +0800] [2882375] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 13:11:40 +0800] [2882375] [INFO] Listening at: http://127.0.0.1:8000 (2882375)
+[2026-03-24 13:11:40 +0800] [2882375] [INFO] Using worker: sync
+[2026-03-24 13:11:40 +0800] [2882375] [INFO] Control socket listening at /opt/main_project/gunicorn.ctl
+[2026-03-24 13:11:40 +0800] [2882377] [INFO] Booting worker with pid: 2882377
+[2026-03-24 13:11:40 +0800] [2882378] [INFO] Booting worker with pid: 2882378
+[2026-03-24 13:17:20 +0800] [2882375] [INFO] Handling signal: term
+[2026-03-24 13:17:20 +0800] [2882378] [INFO] Worker exiting (pid: 2882378)
+[2026-03-24 13:17:20 +0800] [2882377] [INFO] Worker exiting (pid: 2882377)
+[2026-03-24 13:17:20 +0800] [2882375] [INFO] Worker (pid:2882377) was sent SIGTERM!
+[2026-03-24 13:17:20 +0800] [2882375] [INFO] Worker (pid:2882378) was sent SIGTERM!
+[2026-03-24 13:17:20 +0800] [2882375] [INFO] Shutting down: Master
+[2026-03-24 13:17:46 +0800] [2883987] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 13:17:46 +0800] [2883987] [INFO] Listening at: http://127.0.0.1:8000 (2883987)
+[2026-03-24 13:17:46 +0800] [2883987] [INFO] Using worker: sync
+[2026-03-24 13:17:46 +0800] [2883987] [INFO] Control socket listening at /opt/main_project/gunicorn.ctl
+[2026-03-24 13:17:46 +0800] [2883989] [INFO] Booting worker with pid: 2883989
+[2026-03-24 13:17:46 +0800] [2883990] [INFO] Booting worker with pid: 2883990
+[2026-03-24 13:18:27 +0800] [2884186] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 13:18:27 +0800] [2884186] [ERROR] Connection in use: ('127.0.0.1', 8000)
+[2026-03-24 13:18:27 +0800] [2884186] [ERROR] connection to ('127.0.0.1', 8000) failed: [Errno 98] Address already in use
+[2026-03-24 13:18:28 +0800] [2884186] [ERROR] Connection in use: ('127.0.0.1', 8000)
+[2026-03-24 13:18:28 +0800] [2884186] [ERROR] connection to ('127.0.0.1', 8000) failed: [Errno 98] Address already in use
+[2026-03-24 13:18:29 +0800] [2884186] [ERROR] Connection in use: ('127.0.0.1', 8000)
+[2026-03-24 13:18:29 +0800] [2884186] [ERROR] connection to ('127.0.0.1', 8000) failed: [Errno 98] Address already in use
+[2026-03-24 13:18:30 +0800] [2884186] [ERROR] Connection in use: ('127.0.0.1', 8000)
+[2026-03-24 13:18:30 +0800] [2884186] [ERROR] connection to ('127.0.0.1', 8000) failed: [Errno 98] Address already in use
+[2026-03-24 13:18:31 +0800] [2884186] [ERROR] Connection in use: ('127.0.0.1', 8000)
+[2026-03-24 13:18:31 +0800] [2884186] [ERROR] connection to ('127.0.0.1', 8000) failed: [Errno 98] Address already in use
+[2026-03-24 13:18:32 +0800] [2884186] [ERROR] Can't connect to ('127.0.0.1', 8000)
+[2026-03-24 13:18:50 +0800] [2883987] [INFO] Handling signal: term
+[2026-03-24 13:18:50 +0800] [2883989] [INFO] Worker exiting (pid: 2883989)
+[2026-03-24 13:18:50 +0800] [2883990] [INFO] Worker exiting (pid: 2883990)
+[2026-03-24 13:18:50 +0800] [2883987] [INFO] Worker (pid:2883989) was sent SIGTERM!
+[2026-03-24 13:18:50 +0800] [2883987] [INFO] Worker (pid:2883990) was sent SIGTERM!
+[2026-03-24 13:18:51 +0800] [2883987] [INFO] Shutting down: Master

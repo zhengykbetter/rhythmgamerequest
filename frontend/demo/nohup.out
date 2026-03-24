@@ -1,0 +1,49 @@
+[2026-03-24 11:53:05 +0800] [2861326] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 11:53:05 +0800] [2861326] [INFO] Listening at: http://0.0.0.0:80 (2861326)
+[2026-03-24 11:53:05 +0800] [2861326] [INFO] Using worker: sync
+[2026-03-24 11:53:05 +0800] [2861326] [INFO] Control socket listening at /opt/main_project/frontend/demo/gunicorn.ctl
+[2026-03-24 11:53:05 +0800] [2861328] [INFO] Booting worker with pid: 2861328
+[2026-03-24 11:53:05 +0800] [2861329] [INFO] Booting worker with pid: 2861329
+[2026-03-24 11:54:12 +0800] [2861326] [CRITICAL] WORKER TIMEOUT (pid:2861329)
+[2026-03-24 11:54:12 +0800] [2861329] [ERROR] Error handling request (no URI read)
+Traceback (most recent call last):
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/workers/sync.py", line 141, in handle
+    req = next(parser)
+          ^^^^^^^^^^^^
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/parser.py", line 56, in __next__
+    self.mesg = self.mesg_class(self.cfg, self.unreader, self.source_addr, self.req_count)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/message.py", line 324, in __init__
+    super().__init__(cfg, unreader, peer_addr)
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/message.py", line 110, in __init__
+    unused = self.parse(self.unreader)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/message.py", line 336, in parse
+    self.read_into(unreader, buf, stop=True)
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/message.py", line 375, in read_into
+    data = unreader.read()
+           ^^^^^^^^^^^^^^^
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/unreader.py", line 36, in read
+    d = self.chunk()
+        ^^^^^^^^^^^^
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/http/unreader.py", line 65, in chunk
+    return self.sock.recv(self.mxchunk)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/main_project/venv/lib/python3.12/site-packages/gunicorn/workers/base.py", line 198, in handle_abort
+    sys.exit(1)
+SystemExit: 1
+[2026-03-24 11:54:12 +0800] [2861329] [INFO] Worker exiting (pid: 2861329)
+[2026-03-24 11:54:12 +0800] [2861624] [INFO] Booting worker with pid: 2861624
+[2026-03-24 12:29:20 +0800] [2861328] [WARNING] Invalid request from ip=88.214.25.121: Invalid HTTP request line: '\x03\x00\x00/*à\x00\x00\x00\x00\x00Cookie: mstshash=Administr'
+[2026-03-24 13:10:01 +0800] [2861326] [INFO] Handling signal: term
+[2026-03-24 13:10:01 +0800] [2861624] [INFO] Worker exiting (pid: 2861624)
+[2026-03-24 13:10:01 +0800] [2861328] [INFO] Worker exiting (pid: 2861328)
+[2026-03-24 13:10:01 +0800] [2861326] [INFO] Worker (pid:2861328) was sent SIGTERM!
+[2026-03-24 13:10:01 +0800] [2861326] [INFO] Worker (pid:2861624) was sent SIGTERM!
+[2026-03-24 13:10:01 +0800] [2861326] [INFO] Shutting down: Master
+[2026-03-24 13:21:20 +0800] [2884968] [INFO] Starting gunicorn 25.1.0
+[2026-03-24 13:21:20 +0800] [2884968] [INFO] Listening at: http://127.0.0.1:8000 (2884968)
+[2026-03-24 13:21:20 +0800] [2884968] [INFO] Using worker: sync
+[2026-03-24 13:21:20 +0800] [2884968] [INFO] Control socket listening at /opt/main_project/frontend/demo/gunicorn.ctl
+[2026-03-24 13:21:20 +0800] [2884970] [INFO] Booting worker with pid: 2884970
+[2026-03-24 13:21:20 +0800] [2884971] [INFO] Booting worker with pid: 2884971
