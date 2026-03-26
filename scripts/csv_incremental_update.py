@@ -290,8 +290,8 @@ def incremental_update_single(table_name):
     current_md5 = get_file_md5(csv_path)
     last_md5 = processed_state.get(table_name, {}).get("md5", "")
     if current_md5 == last_md5 and last_md5 != "":
-        print(f"ℹ️ 提示：{table_name} 的CSV无变化，跳过更新！")
-        return True
+        print(f"ℹ️ 提示：{table_name} 的CSV无变化，不跳过更新！")
+        return False
 
     # CSV存档
     archive_csv(table_name, csv_path)
