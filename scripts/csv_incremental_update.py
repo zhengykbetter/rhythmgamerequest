@@ -67,7 +67,7 @@ TABLE_RULES = {
         "date_cols": [],
         "field_types": {
             "author_id": "VARCHAR(50)",
-            "作者名": "VARCHAR(300)",       # 旧：作者本名
+            "作者名": "VARCHAR(1000)",       # 旧：作者本名
             "别名": "VARCHAR(500)",          # 旧：作者别称
             "备注": "VARCHAR(500)",
             "最新更新时间": "DATETIME",
@@ -84,9 +84,9 @@ TABLE_RULES = {
         "date_cols": [],                   # 移除了旧的"歌曲更新时间"
         "field_types": {
             "song_id": "VARCHAR(50)",
-            "歌名": "VARCHAR(200)",
-            "别名": "VARCHAR(500)",        # 长度放宽以适应合并后的别名
-            "作者": "VARCHAR(300)",         # 新增：名义作者
+            "歌名": "VARCHAR(1000)",
+            "别名": "VARCHAR(1000)",        # 长度放宽以适应合并后的别名
+            "作者": "VARCHAR(1000)",         # 新增：名义作者
             "本家": "VARCHAR(200)",         # 新增：本家字段
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
@@ -122,8 +122,8 @@ TABLE_RULES = {
             "rel_id": "VARCHAR(100)",
             "song_id": "VARCHAR(50)",
             "author_id": "VARCHAR(50)",
-            "曲名": "VARCHAR(200)",          # 新增：冗余核对字段
-            "作者名": "VARCHAR(300)",         # 新增：冗余核对字段
+            "曲名": "VARCHAR(1000)",          # 新增：冗余核对字段
+            "作者名": "VARCHAR(1000)",         # 新增：冗余核对字段
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
         },
