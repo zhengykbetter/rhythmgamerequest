@@ -116,10 +116,58 @@ def index():
                 margin-bottom: 10px;
                 text-shadow: 0 2px 10px rgba(0,0,0,0.2);
             }
-            .header p {
-                font-size: 1.1rem;
-                opacity: 0.9;
+            
+            /* 🎨 新增：数据看板样式 */
+            .stats-banner {
+                background: rgba(255, 255, 255, 0.15);
+                backdrop-filter: blur(10px);
+                border-radius: 16px;
+                padding: 20px 30px;
+                display: inline-flex;
+                gap: 30px;
+                justify-content: center;
+                align-items: center;
+                margin-top: 15px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                flex-wrap: wrap;
             }
+            .stat-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                color: white;
+            }
+            .stat-icon {
+                font-size: 1.8rem;
+                animation: bounce 2s infinite;
+            }
+            .stat-text {
+                text-align: left;
+            }
+            .stat-label {
+                font-size: 0.85rem;
+                opacity: 0.9;
+                font-weight: 500;
+            }
+            .stat-value {
+                font-size: 1.6rem;
+                font-weight: 800;
+                text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                background: linear-gradient(135deg, #fff 0%, #ffeaa7 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            .stat-divider {
+                width: 2px;
+                height: 40px;
+                background: rgba(255,255,255,0.3);
+            }
+            @keyframes bounce {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-5px); }
+            }
+
             .main-card {
                 background: white;
                 border-radius: 20px;
@@ -439,6 +487,10 @@ def index():
                 .issues-bar { padding: 10px; flex-direction: column; gap: 10px; }
                 .issues-btn { width: 100%; }
                 body { padding-bottom: 180px; }
+                .stats-banner { gap: 15px; padding: 15px; }
+                .stat-divider { display: none; }
+                .stat-item { flex-direction: column; text-align: center; gap: 5px; }
+                .stat-text { text-align: center; }
             }
         </style>
     </head>
@@ -446,7 +498,33 @@ def index():
         <div class="container">
             <div class="header">
                 <h1>🎮 RhythmGameQuery</h1>
-                <p>少女正在施工中，thinking...</p>
+                
+                <!-- 🎨 修改后的数据看板 -->
+                <div class="stats-banner">
+                    <div class="stat-item">
+                        <span class="stat-icon">📊</span>
+                        <div class="stat-text">
+                            <div class="stat-label">收录信息</div>
+                            <div class="stat-value">6,455</div>
+                        </div>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-icon">🎵</span>
+                        <div class="stat-text">
+                            <div class="stat-label">歌曲</div>
+                            <div class="stat-value">5,483</div>
+                        </div>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-icon">🎹</span>
+                        <div class="stat-text">
+                            <div class="stat-label">曲师</div>
+                            <div class="stat-value">3,108</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="main-card">
