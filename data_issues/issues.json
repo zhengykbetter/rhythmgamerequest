@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "name": "我",
+    "contact": "",
+    "content": "有毛病",
+    "status": "待处理",
+    "create_time": "2026-03-24 19:23:34"
+  },
+  {
+    "id": 2,
+    "name": "Dirac",
+    "contact": "",
+    "content": "我要玩舞萌😡里面🥵好吃的🤯13+",
+    "status": "待处理",
+    "create_time": "2026-03-24 19:31:59"
+  },
+  {
+    "id": 3,
+    "name": "我",
+    "contact": "",
+    "content": "每日一测：你听过它的什么歌？",
+    "status": "待处理",
+    "create_time": "2026-03-24 21:40:05"
+  }
+]

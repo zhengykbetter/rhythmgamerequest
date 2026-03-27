@@ -1,0 +1,56 @@
+{
+  "game_info": {
+    "md5": "c4ba853ff2d21afaa2fe47d9386fff1d",
+    "process_time": "2026-03-27 15:44:24",
+    "sync_stats": {
+      "add": 11,
+      "update": 0,
+      "delete": 0
+    }
+  },
+  "song_info": {
+    "md5": "47dddd3cd8c47d35e620f53a9d8c0540",
+    "process_time": "2026-03-27 15:44:25",
+    "sync_stats": {
+      "add": 5483,
+      "update": 0,
+      "delete": 0
+    }
+  },
+  "author_info": {
+    "md5": "8631270e10807b5e3e59f31130e67f1f",
+    "process_time": "2026-03-27 15:44:24",
+    "sync_stats": {
+      "add": 2997,
+      "update": 0,
+      "delete": 0
+    }
+  },
+  "game_song_rel": {
+    "md5": "6ab434384e5e7f3a8bce5cb9d331a2c1",
+    "process_time": "2026-03-27 15:44:25",
+    "sync_stats": {
+      "add": 6455,
+      "update": 0,
+      "delete": 0
+    }
+  },
+  "song_author_rel": {
+    "md5": "8468c225605b2ed95876906d5d83649f",
+    "process_time": "2026-03-27 15:44:26",
+    "sync_stats": {
+      "add": 6780,
+      "update": 0,
+      "delete": 0
+    }
+  },
+  "game_linkage_rel": {
+    "md5": "0b86243a27e60cbd831a764dfbd2b3b9",
+    "process_time": "2026-03-24 15:58:25",
+    "sync_stats": {
+      "add": 58,
+      "update": 0,
+      "delete": 0
+    }
+  }
+}
