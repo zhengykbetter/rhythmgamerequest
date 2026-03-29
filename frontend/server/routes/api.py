@@ -1,12 +1,10 @@
 from flask import Blueprint, request, jsonify
 from server.services.issue_service import add_issue, load_issues
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-from server.llm_service import llm_query
+from server.llm_service import llm_query  # 确保这个也能找到，如果报错也需要检查路径
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
+# ... 下面的代码保持不变 ...
 @api_bp.route('/query', methods=['POST'])
 def api_query():
     try:

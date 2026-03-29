@@ -1,10 +1,7 @@
 from flask import Blueprint, render_template, request
 from server.services.visit_service import get_visit_count, get_luck
 from server.config import Config
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-from config.version import APP_VERSION
+from config.version import APP_VERSION  # 现在可以直接导入了
 
 main_bp = Blueprint('main', __name__)
 
