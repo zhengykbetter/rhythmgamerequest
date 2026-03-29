@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from server.services.issue_service import add_issue, load_issues
-from server.services.query_log_service import log_query_simple
+from server.services.query_log_services import log_query_simple
 from server.llm_service import llm_query  # 确保这个也能找到，如果报错也需要检查路径
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
