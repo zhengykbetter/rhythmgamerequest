@@ -513,15 +513,19 @@
 
     <!-- 👇 新增：页脚 Footer -->
     <footer class="site-footer">
-        <nav class="footer-nav">
-            <a href="/benchmark" class="footer-link">📊 Benchmark</a>
-            <a href="/constraints" class="footer-link">🔗 数据库约束</a>
-            <a href="/roadmap" class="footer-link">🗺️ 长期规划</a>
-            <a href="/issues" class="footer-link">🐛 关于 Issues</a>
-        </nav>
-        <div class="footer-copyright">
-            © 2026 RhythmGameQuery. All rights reserved.
-        </div>
+    <nav class="footer-nav">
+        <a href="/benchmark" class="footer-link">📊 Benchmark</a>
+        <a href="/constraints" class="footer-link">🔗 数据库约束</a>
+        <a href="/roadmap" class="footer-link">🗺️ 长期规划</a>
+        <a href="/issues" class="footer-link">🐛 提交 Issue</a>
+        <!-- 👇 新增：这个按钮不跳转，只弹窗 -->
+        <button class="footer-link" onclick="showViewModal()" style="border:none;cursor:pointer;">
+            👀 查看列表
+        </button>
+    </nav>
+    <div class="footer-copyright">
+        © 2026 RhythmGameQuery. All rights reserved.
+    </div>
     </footer>
 
     <!-- 提交 Issue 弹窗 -->

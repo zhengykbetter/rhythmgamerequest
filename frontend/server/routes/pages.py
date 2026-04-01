@@ -1,4 +1,5 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from server.services.issue_service import load_issues, add_issue # 导入 service
 
 pages_bp = Blueprint('pages', __name__)
 
@@ -17,6 +18,21 @@ def constraints():
 def roadmap():
     return render_under_construction("长期规划 (Roadmap)")
 
-@pages_bp.route('/issues')
-def issues():
-    return render_under_construction("关于 Issues") # 暂时也用施工中，或者你可以单独做页面
+# ===================== 新增：独立的 Issues 页面 =====================
+@pages_bp.route('/issues', methods=['GET', 'POST'])
+def issues_page():
+    if request.method == 'POST':
+        # 处理表单提交
+        name = request.form.get('name', '').strip()
+        contact = request.form.get('contact', '').strip()
+        content = request.form.get('content', '').strip()
+        
+        if name and content:
+            add_issue(name, contact, content)
+            # 提交成功，重定向回首页或者显示成功页
+            return render_template('issues.html', success=True)
+        else:
+            return render_template('issues.html', error="请填写称呼和内容")
+    
+    # GET 请求，显示表单
+    return render_template('issues.html')
