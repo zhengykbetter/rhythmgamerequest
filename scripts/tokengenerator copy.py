@@ -13,7 +13,6 @@ DATA_CSV_DIR = PROJECT_DIR / "data_csv"
 INPUT_CSV = DATA_CSV_DIR / "songraw_info.csv"
 OUTPUT_TOKEN_CSV = DATA_CSV_DIR / "songtoken.csv"
 OUTPUT_FUZZY_SUMMARY = DATA_CSV_DIR / "fuzzy_match_pairs.csv"
-OUTPUT_AUTHOR_TOKEN_MAP = DATA_CSV_DIR / "author_token_map.csv"  # 新增：作者Token映射表
 
 # ===================== 【修复】标准化函数（强化版，无例外） =====================
 def normalize_string(s: str) -> str:
@@ -289,43 +288,21 @@ def main():
         all_pairs.append(p)
 
     DATA_CSV_DIR.mkdir(exist_ok=True)
-    
-    # 保存歌曲Token表
     token_headers = ["song_id", "歌名token", "作者token"]
     with open(OUTPUT_TOKEN_CSV, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=token_headers)
         writer.writeheader()
         writer.writerows(token_output)
     
-    # 保存模糊匹配记录表
     fuzzy_headers = ["匹配类型", "token", "id1", "内容1", "id2", "内容2"]
     with open(OUTPUT_FUZZY_SUMMARY, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fuzzy_headers)
         writer.writeheader()
         writer.writerows(all_pairs)
 
-    # ===================== 【新增】生成作者原名-Token映射表 =====================
-    print("\n5. 生成作者Token映射表...")
-    author_token_list = []
-    for author_name in sorted(all_authors_set):
-        if not author_name:
-            continue
-        token = author_matcher.get_token(author_name)
-        author_token_list.append({
-            "作者原名": author_name,
-            "作者Token": token
-        })
-    
-    author_map_headers = ["作者原名", "作者Token"]
-    with open(OUTPUT_AUTHOR_TOKEN_MAP, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=author_map_headers)
-        writer.writeheader()
-        writer.writerows(author_token_list)
-
     print(f"\n🎉 全部完成！")
     print(f"✅ 歌曲Token表：{OUTPUT_TOKEN_CSV.name}")
     print(f"✅ 模糊匹配记录表：{OUTPUT_FUZZY_SUMMARY.name}（{len(all_pairs)} 条）")
-    print(f"✅ 作者Token映射表：{OUTPUT_AUTHOR_TOKEN_MAP.name}（{len(author_token_list)} 条）")
     print("=" * 60)
 
 if __name__ == "__main__":
