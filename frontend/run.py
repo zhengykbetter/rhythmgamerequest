@@ -2,27 +2,24 @@ import os
 import sys
 from pathlib import Path
 
-# ===================== 核心修复：路径处理 =====================
-# 获取当前文件 (run.py) 的绝对路径
+# ===================== 核心路径配置（无冗余、绝对精准） =====================
+# 获取 run.py 绝对路径
 FILE = Path(__file__).resolve()
-# 定位到 frontend 目录
+# frontend 根目录
 FRONTEND_ROOT = FILE.parent
-# 定位到主项目根目录 (main_project)，因为 config 在那里
+# 项目主根目录（frontend 的上级）
 MAIN_PROJECT_ROOT = FRONTEND_ROOT.parent
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+# 强制将两个核心目录加入Python搜索路径（解决所有模块导入问题）
+sys.path.insert(0, str(FRONTEND_ROOT))
+sys.path.insert(0, str(MAIN_PROJECT_ROOT))
+# ==========================================================================
 
-# 将这两个目录都加入 sys.path，确保能找到所有模块
-if str(FRONTEND_ROOT) not in sys.path:
-    sys.path.insert(0, str(FRONTEND_ROOT))
-if str(MAIN_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(MAIN_PROJECT_ROOT))
-# ===============================================================
-
+# 导入应用（完全兼容你原有的导入方式）
 from server.app import create_app
 
 app = create_app()
 
+# 启动配置（保持你原有的参数）
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
