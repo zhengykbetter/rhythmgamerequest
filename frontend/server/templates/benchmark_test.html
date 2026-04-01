@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benchmark Test - RhythmGameQuery</title>
+    <style>
+        /* 完全复用你首页的渐变背景、字体、卡片、按钮、表格样式 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            padding: 40px 20px 150px; /* 底部留空给固定提交栏 */
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 30px;
+        }
+        h1 { color: #667eea; margin-bottom: 30px; text-align: center; }
+        .question-card {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .question-title {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .query-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 15px;
+        }
+        .query-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
+        .query-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .result-box { margin-bottom: 15px; }
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .result-table th, .result-table td {
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            text-align: left;
+        }
+        .result-table th { background: #f5f7fa; color: #667eea; }
+        .score-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .score-btn {
+            padding: 10px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        .score-btn:hover { border-color: #667eea; color: #667eea; }
+        .score-btn.selected { border-color: transparent; color: white; }
+        .score-btn[data-score="-1"].selected { background: #d32f2f; }
+        .score-btn[data-score="0"].selected { background: #f57c00; }
+        .score-btn[data-score="1"].selected { background: #1976d2; }
+        .score-btn[data-score="2"].selected { background: #388e3c; }
+        /* 固定底部提交栏 */
+        .submit-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .submit-bar .total-score {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #667eea;
+        }
+        .submit-bar .name-input {
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 250px;
+            transition: all 0.3s;
+        }
+        .submit-bar .name-input:focus { outline: none; border-color: #667eea; }
+        .submit-bar .submit-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .submit-bar .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
+        .submit-bar .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        .footer {
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            font-size: 0.9rem;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Benchmark Test v1</h1>
+        {% for q in questions %}
+        <div class="question-card" data-question-id="{{ q.id }}">
+            <div class="question-title">Q{{ q.id }}. {{ q.question }}</div>
+            <button class="query-btn" onclick="startQuery({{ q.id }}, '{{ q.question }}')">开始查询</button>
+            <div class="result-box" id="result-{{ q.id }}" style="display: none;"></div>
+            <div class="score-buttons" id="score-{{ q.id }}" style="display: none;">
+                <button class="score-btn" data-score="-1" onclick="selectScore({{ q.id }}, -1)">-1</button>
+                <button class="score-btn" data-score="0" onclick="selectScore({{ q.id }}, 0)">0</button>
+                <button class="score-btn" data-score="1" onclick="selectScore({{ q.id }}, 1)">1</button>
+                <button class="score-btn" data-score="2" onclick="selectScore({{ q.id }}, 2)">2</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="footer">
+        © 2026 RhythmGameQuery. All rights reserved.
+    </div>
+
+    <!-- 固定底部提交栏 -->
+    <div class="submit-bar">
+        <div class="total-score">总分：<span id="total-score">0</span> 分</div>
+        <input type="text" class="name-input" id="name-input" placeholder="输入你的名字（可选，将成为永久 Contributor）">
+        <button class="submit-btn" id="submit-btn" onclick="submitTest()">提交测试</button>
+    </div>
+
+    <script>
+        // 全局状态管理
+        const benchmarkState = {
+            questions: {{ questions | tojson }},
+            scores: {}, // {题目id: 分数}
+            queryResults: {} // {题目id: {data, sql, error}}
+        };
+
+        // 1. 开始查询
+        async function startQuery(questionId, questionText) {
+            const btn = document.querySelector(`[data-question-id="${questionId}"] .query-btn`);
+            const resultBox = document.getElementById(`result-${questionId}`);
+            const scoreBox = document.getElementById(`score-${questionId}`);
+
+            // 按钮状态
+            btn.disabled = true;
+            btn.textContent = "查询中...";
+
+            try {
+                // 完全复用你现有的 /api/query 接口
+                const response = await fetch("/api/query", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: questionText })
+                });
+                const data = await response.json();
+
+                // 渲染查询结果（不折叠）
+                let resultHtml = "";
+                if (data.success && data.data.length > 0) {
+                    resultHtml += `<h3 style="margin-bottom: 10px; color: #388e3c;">✅ 查询成功</h3>`;
+                    resultHtml += `<table class="result-table"><thead><tr>`;
+                    // 渲染表头
+                    const headers = Object.keys(data.data[0]);
+                    headers.forEach(h => resultHtml += `<th>${h}</th>`);
+                    resultHtml += `</tr></thead><tbody>`;
+                    // 渲染数据
+                    data.data.forEach(row => {
+                        resultHtml += `<tr>`;
+                        headers.forEach(h => resultHtml += `<td>${row[h] || ''}</td>`);
+                        resultHtml += `</tr>`;
+                    });
+                    resultHtml += `</tbody></table>`;
+                } else if (data.success && data.data.length === 0) {
+                    resultHtml += `<h3 style="margin-bottom: 10px; color: #f57c00;">⚠️ 查询成功但无数据</h3>`;
+                } else {
+                    resultHtml += `<h3 style="margin-bottom: 10px; color: #d32f2f;">❌ 查询失败</h3>`;
+                    resultHtml += `<p style="color: #d32f2f;">${data.error_msg || '未知错误'}</p>`;
+                }
+                resultBox.innerHTML = resultHtml;
+                resultBox.style.display = "block";
+
+                // 显示打分按钮
+                scoreBox.style.display = "flex";
+
+                // 保存查询结果
+                benchmarkState.queryResults[questionId] = data;
+
+            } catch (e) {
+                resultBox.innerHTML = `<h3 style="margin-bottom: 10px; color: #d32f2f;">❌ 查询失败</h3><p style="color: #d32f2f;">${e.message}</p>`;
+                resultBox.style.display = "block";
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "重新查询";
+            }
+        }
+
+        // 2. 选择分数
+        function selectScore(questionId, score) {
+            // 更新状态
+            benchmarkState.scores[questionId] = score;
+
+            // 更新UI
+            const scoreBtns = document.querySelectorAll(`#score-${questionId} .score-btn`);
+            scoreBtns.forEach(btn => {
+                btn.classList.remove("selected");
+                if (parseInt(btn.dataset.score) === score) {
+                    btn.classList.add("selected");
+                }
+            });
+
+            // 更新总分
+            updateTotalScore();
+        }
+
+        // 3. 更新总分
+        function updateTotalScore() {
+            const totalScore = Object.values(benchmarkState.scores).reduce((sum, s) => sum + parseInt(s), 0);
+            document.getElementById("total-score").textContent = totalScore;
+        }
+
+        // 4. 提交测试
+        async function submitTest() {
+            const submitBtn = document.getElementById("submit-btn");
+            const nameInput = document.getElementById("name-input");
+
+            // 基础校验
+            const allQuestionIds = benchmarkState.questions.map(q => q.id);
+            const answeredIds = Object.keys(benchmarkState.scores).map(id => parseInt(id));
+            const missingIds = allQuestionIds.filter(id => !answeredIds.includes(id));
+            if (missingIds.length > 0) {
+                alert(`请完成所有题目的查询和打分！未完成的题目：Q${missingIds.join(', Q')}`);
+                return;
+            }
+
+            // 按钮状态
+            submitBtn.disabled = true;
+            submitBtn.textContent = "提交中...";
+
+            try {
+                const response = await fetch("/api/benchmark/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: nameInput.value,
+                        question_scores: benchmarkState.scores,
+                        version: "v1"
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert("恭喜你已提交！");
+                    window.location.href = "/";
+                } else {
+                    alert(`提交失败：${data.error}`);
+                }
+
+            } catch (e) {
+                alert(`提交失败：${e.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "提交测试";
+            }
+        }
+    </script>
+</body>
+</html>

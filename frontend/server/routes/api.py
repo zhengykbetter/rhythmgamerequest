@@ -120,3 +120,42 @@ def list_issues():
         return jsonify({"data": load_issues()})
     except Exception as e:
         return jsonify({"data": [], "error": str(e)})
+
+# ===================== Benchmark 第一阶段接口 =====================
+@api_bp.route('/benchmark/questions', methods=['GET'])
+def get_benchmark_questions():
+    """
+    获取指定版本的题库列表
+    参数：version（默认v1）
+    """
+    from server.services.benchmark_service import load_questions
+    version = request.args.get('version', 'v1')
+    questions = load_questions(version)
+    return jsonify({"success": True, "data": questions})
+
+@api_bp.route('/benchmark/submit', methods=['POST'])
+def submit_benchmark():
+    """
+    提交测试结果
+    参数：name（可选）、question_scores（必填，{题目id: 分数}）、version（默认v1）
+    """
+    from server.services.benchmark_service import add_contributor
+    try:
+        data = request.json
+        name = data.get('name', '')
+        question_scores = data.get('question_scores', {})
+        version = data.get('version', 'v1')
+
+        # 基础校验
+        if not question_scores:
+            return jsonify({"success": False, "error": "请完成所有题目打分"})
+        
+        # 计算总分
+        total_score = sum([int(score) for score in question_scores.values()])
+        
+        # 保存贡献者
+        add_contributor(name, total_score, question_scores, version)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
