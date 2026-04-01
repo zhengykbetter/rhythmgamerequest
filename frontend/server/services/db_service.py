@@ -28,46 +28,30 @@ def get_mysql_engine():
         f"{MYSQL_CONFIG['host']}:{MYSQL_CONFIG['port']}/{MYSQL_CONFIG['database']}?charset={MYSQL_CONFIG['charset']}"
     )
     return create_engine(conn_str, pool_pre_ping=True, pool_recycle=3600)
-
-# ===================== 新增：首页统计查询 =====================
 def get_dashboard_stats():
-    """
-    查询首页看板需要的三个数据
-    返回一个字典: {'info_count': 0, 'song_count': 0, 'artist_count': 0}
-    """
     engine = get_mysql_engine()
+    
+    # 【调试】先检查配置到底加载了没
     if not engine:
-        return {'info_count': 6455, 'song_count': 5483, 'artist_count': 3108} # 兜底默认值
+        # 如果这里返回，说明 MYSQL_CONFIG 是空的，没导入成功
+        return {'info_count': 99999, 'song_count': 99999, 'artist_count': 99999}
 
     try:
         with engine.connect() as conn:
-            # 注意：这里需要你根据实际的表名修改 SQL！！
-            # 我假设了表名，你需要改成你真实的表名
+            # ... (你的 SQL 代码保持不变) ...
+            # 为了测试，可以先执行一句最简单的 SQL
+            result = conn.execute(text("SELECT 1"))
+            print("数据库连接成功！")
             
-            # 1. 查询收录信息数 (假设表名是 game_info)
-            result = conn.execute(text("SELECT COUNT(*) FROM game_song_rel"))
-            info_count = result.scalar()
+            # ... 原本的 COUNT 查询 ...
             
-            # 2. 查询歌曲数 (假设表名是 songs)
-            result = conn.execute(text("SELECT COUNT(*) FROM song_info"))
-            song_count = result.scalar()
-            
-            # 3. 查询曲师数 (假设表名是 artists)
-            result = conn.execute(text("SELECT COUNT(*) FROM author_info"))
-            artist_count = result.scalar()
-
-            # --- 临时演示代码（请替换上面的真实查询） ---
-            # info_count = 6455
-            # song_count = 5483
-            # artist_count = 3108
-            # ---------------------------------------------
-
-            return {
-                'info_count': info_count,
-                'song_count': song_count,
-                'artist_count': artist_count
-            }
     except Exception as e:
-        print(f"[DB Error] {e}")
-        # 数据库挂了也给个默认值，保证网页能打开
-        return {'info_count': 6455, 'song_count': 5483, 'artist_count': 3108}
+        # 【调试】把错误信息塞进返回值里，这样网页上就能看到
+        error_msg = str(e)
+        print(f"[DB Error] {error_msg}")
+        return {
+            'info_count': 0, 
+            'song_count': 0, 
+            # 把错误信息放在这里，网页上曲师数的位置会显示错误
+            'artist_count': f"ERR: {error_msg[:20]}" 
+        }
