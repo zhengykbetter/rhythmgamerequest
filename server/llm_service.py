@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-✅ LLM自然语言转SQL（最终正式版）
-修复：误拦截问题 | 新增：危险操作详细日志 | 规则：只拦截不执行
+✅ LLM自然语言转SQL（适配新版查询接口）
+功能：仅生成合规SQL + 安全校验，不执行查询
+供 api.py 调用
 """
 import os
 import sys
@@ -19,7 +20,6 @@ from openai import OpenAI
 # 工具导入
 from server.encoding_utils import safe_input, safe_print
 from scripts.csv_incremental_update import TABLE_RULES
-from server.db_query import query_database
 
 # 加载配置
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))
@@ -82,39 +82,40 @@ def validate_sql_safety(sql: str) -> bool:
     safe_print(f"[违规SQL] {sql}")
     return False
 
-# ===================== 自然语言转SQL =====================
-def nl_to_sql(natural_query: str) -> str:
+# ===================== 核心：自然语言转SQL（函数名适配 api.py） =====================
+def generate_sql(natural_query: str) -> str:
+    """
+    供 api.py 调用的核心函数
+    返回：合规SQL / 空字符串
+    """
     if not LLM_CONFIG["api_key"]:
         safe_print("[❌ 错误] 请配置.env中的LLM_API_KEY")
         return ""
+        
     try:
+        # 调用LLM生成SQL
         resp = client.chat.completions.create(
             model=LLM_CONFIG["model"],
             temperature=LLM_CONFIG["temperature"],
-            messages=[{"role": "system", "content": get_table_schema_prompt()},
-                      {"role": "user", "content": natural_query}]
+            messages=[
+                {"role": "system", "content": get_table_schema_prompt()},
+                {"role": "user", "content": natural_query}
+            ]
         )
+        # 清洗SQL格式（去除markdown标签）
         sql = resp.choices[0].message.content.strip()
-        return re.sub(r"```sql|```", "", sql).strip()
+        sql = re.sub(r"```sql|```", "", sql).strip()
+        
+        # 安全校验
+        if validate_sql_safety(sql):
+            return sql
+        return ""
+        
     except Exception as e:
         safe_print(f"[❌ LLM调用失败：{str(e)}]")
         return ""
 
-# ===================== 全流程查询 =====================
-def llm_query(q: str):
-    safe_print(f"\n[🔍 你的查询] {q}")
-    sql = nl_to_sql(q)
-    
-    if not sql:
-        safe_print("[ℹ️] LLM未生成有效SQL")
-        return []
-    
-    if not validate_sql_safety(sql):
-        return []
-    
-    return query_database(sql)
-
-# ===================== 主程序 =====================
+# ===================== 保留本地测试入口（无改动） =====================
 if __name__ == "__main__":
     safe_print("=" * 60)
     safe_print("🎯 LLM自然语言查询数据库（输入 exit 退出）")
@@ -128,4 +129,9 @@ if __name__ == "__main__":
         if not user_q:
             safe_print("⚠️ 请输入有效内容")
             continue
-        llm_query(user_q)
+        # 本地测试仅生成并打印SQL
+        test_sql = generate_sql(user_q)
+        if test_sql:
+            safe_print(f"[✅ 生成SQL] {test_sql}")
+        else:
+            safe_print("[ℹ️] 未生成有效SQL")

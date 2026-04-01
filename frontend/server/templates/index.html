@@ -13,12 +13,10 @@
             min-height: 100vh;
             padding: 20px;
             color: #333;
-            /* 👇 新增：Flex 布局 */
             display: flex;
             flex-direction: column;
         }
 
-        /* 👇 新增：主要内容区域 */
         .main-content {
             flex: 1;
             width: 100%;
@@ -39,7 +37,6 @@
             text-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
         
-        /* 🎨 新增：数据看板样式 */
         .stats-banner {
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
@@ -235,14 +232,13 @@
             color: #333;
         }
         .version-box {
-            /* 移除固定定位，让它自然流动 */
             background: white;
             padding: 20px 30px;
             border-radius: 15px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
             text-align: center;
             max-width: 300px;
-            margin: 0 auto 30px; /* 居中并增加底部间距 */
+            margin: 0 auto 30px;
         }
         .version-text {
             font-size: 1rem;
@@ -259,19 +255,63 @@
             font-size: 0.9rem;
         }
         
-        /* ❌ 删除旧的浮动 Issues Bar 样式 */
+        /* ===================== 🔥 新增：调试信息面板样式 ===================== */
+        .debug-panel {
+            margin-top: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+        }
+        .debug-header {
+            background: #f5f7fa;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+        .debug-body {
+            padding: 15px;
+            display: none;
+        }
+        .debug-body.active {
+            display: block;
+        }
+        .sql-code {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            margin: 10px 0;
+            color: #333;
+        }
+        .debug-info {
+            margin: 10px 0;
+            color: #666;
+            line-height: 1.6;
+        }
+        .debug-error {
+            background: #fff0f0;
+            color: #d32f2f;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        /* ===================================================================== */
 
-        /* 👇 新增：页脚 Footer 样式 */
         .site-footer {
             background: rgba(0, 0, 0, 0.3);
             color: rgba(255, 255, 255, 0.9);
             padding: 30px 20px;
             text-align: center;
             width: 100%;
-            margin-top: auto; /* 推到底部 */
-            border-radius: 0;
+            margin-top: auto;
         }
-
         .footer-nav {
             display: flex;
             justify-content: center;
@@ -279,7 +319,6 @@
             flex-wrap: wrap;
             margin-bottom: 15px;
         }
-
         .footer-link {
             color: white;
             text-decoration: none;
@@ -290,18 +329,17 @@
             font-size: 1rem;
             font-weight: 600;
             display: inline-block;
+            border: none;
+            cursor: pointer;
         }
-
         .footer-link:hover {
             background: rgba(255, 255, 255, 0.3);
             transform: translateY(-2px);
         }
-
         .footer-copyright {
             font-size: 0.85rem;
             opacity: 0.6;
         }
-
         .modal {
             display: none;
             position: fixed;
@@ -431,13 +469,10 @@
     </style>
 </head>
 <body>
-    <!-- 👇 新增：包裹主要内容 -->
     <div class="main-content">
         <div class="container">
             <div class="header">
                 <h1>🎮 RhythmGameQuery</h1>
-                
-                <!-- 🎨 修改后的数据看板 -->
                 <div class="stats-banner">
                     <div class="stat-item">
                         <span class="stat-icon">📊</span>
@@ -485,6 +520,23 @@
                     </div>
                 </div>
 
+                <!-- ===================== 🔥 新增：调试信息面板（结果面板下方） ===================== -->
+                <div id="debugPanel" class="debug-panel">
+                    <div class="debug-header" onclick="toggleDebugPanel()">
+                        <span>🔍 调试信息</span>
+                        <span id="debugArrow">▼</span>
+                    </div>
+                    <div class="debug-body" id="debugBody">
+                        <div class="debug-info">
+                            ⏱️ 执行耗时：<span id="execTime">0</span>s | 📊 结果行数：<span id="resultCount">0</span>
+                        </div>
+                        <div><strong>生成的 SQL 语句：</strong></div>
+                        <pre class="sql-code" id="sqlCode"></pre>
+                        <div id="errorDetail" class="debug-error" style="display:none;"></div>
+                    </div>
+                </div>
+                <!-- ===================================================================== -->
+
                 <div class="info-row">
                     <div class="info-card">
                         <h3>今日运势</h3>
@@ -503,29 +555,23 @@
             </div>
         </div>
 
-        <!-- 版本盒子移到这里，不再固定 -->
         <div class="version-box">
             <div class="version-text">版本：{{ version }}</div>
             <button class="blog-btn" onclick="showBlog()">更新日志</button>
         </div>
     </div>
-    <!-- 👆 主要内容包裹结束 -->
 
-    <!-- 👇 新增：页脚 Footer -->
     <footer class="site-footer">
-    <nav class="footer-nav">
-        <a href="/benchmark" class="footer-link">📊 Benchmark</a>
-        <a href="/constraints" class="footer-link">🔗 数据库约束</a>
-        <a href="/roadmap" class="footer-link">🗺️ 长期规划</a>
-        <a href="/issues" class="footer-link">🐛 提交 Issue</a>
-        <!-- 👇 新增：这个按钮不跳转，只弹窗 -->
-        <button class="footer-link" onclick="showViewModal()" style="border:none;cursor:pointer;">
-            👀 查看列表
-        </button>
-    </nav>
-    <div class="footer-copyright">
-        © 2026 RhythmGameQuery. All rights reserved.
-    </div>
+        <nav class="footer-nav">
+            <a href="/benchmark" class="footer-link">📊 Benchmark</a>
+            <a href="/constraints" class="footer-link">🔗 数据库约束</a>
+            <a href="/roadmap" class="footer-link">🗺️ 长期规划</a>
+            <a href="/issues" class="footer-link">🐛 提交 Issue</a>
+            <button class="footer-link" onclick="showViewModal()">👀 查看列表</button>
+        </nav>
+        <div class="footer-copyright">
+            © 2026 RhythmGameQuery. All rights reserved.
+        </div>
     </footer>
 
     <!-- 提交 Issue 弹窗 -->
@@ -583,6 +629,15 @@
         setInterval(updateTime, 1000);
         updateTime();
 
+        // ===================== 🔥 新增：调试面板折叠/展开函数 =====================
+        function toggleDebugPanel() {
+            const body = document.getElementById("debugBody");
+            const arrow = document.getElementById("debugArrow");
+            body.classList.toggle("active");
+            arrow.textContent = body.classList.contains("active") ? "▲" : "▼";
+        }
+
+        // ===================== 🔥 改造：查询逻辑（适配新接口+调试面板） =====================
         async function executeQuery() {
             const query = document.getElementById("queryInput").value.trim();
             if (!query) {
@@ -590,9 +645,11 @@
                 return;
             }
 
+            // 重置所有状态
             document.getElementById("loading").style.display = "block";
             document.getElementById("resultBox").style.display = "none";
             document.getElementById("error").style.display = "none";
+            document.getElementById("debugPanel").style.display = "none";
             document.getElementById("queryBtn").disabled = true;
 
             try {
@@ -603,22 +660,60 @@
                 });
                 const data = await response.json();
 
-                if (data.error) {
-                    document.getElementById("error").innerText = data.error;
+                // 填充调试信息
+                document.getElementById("sqlCode").textContent = data.generated_sql || "无";
+                document.getElementById("execTime").textContent = data.execution_time || "0";
+                document.getElementById("resultCount").textContent = data.result_count || "0";
+                
+                const errorDetail = document.getElementById("errorDetail");
+                if (data.error_stage && data.error_msg) {
+                    errorDetail.textContent = `错误类型：${data.error_stage} | 错误信息：${data.error_msg}`;
+                    errorDetail.style.display = "block";
+                } else {
+                    errorDetail.style.display = "none";
+                }
+
+                // 处理结果
+                if (!data.success) {
+                    // 失败场景：显示错误+展开调试面板
+                    document.getElementById("error").innerText = "❌ 数据库执行出错，请查看下方详情";
                     document.getElementById("error").style.display = "block";
-                } else if (data.data && data.data.length > 0) {
+                    showDebugPanel(true);
+                } else if (data.result_count === 0) {
+                    // 无数据场景：优化提示+展开调试面板
+                    document.getElementById("error").innerText = "✅ SQL 执行成功，但数据库中未找到匹配数据";
+                    document.getElementById("error").style.display = "block";
+                    showDebugPanel(true);
+                } else {
+                    // 成功有数据：显示结果+折叠调试面板
                     renderTable(data.data);
                     document.getElementById("resultBox").style.display = "block";
-                } else {
-                    document.getElementById("error").innerText = "未查询到数据";
-                    document.getElementById("error").style.display = "block";
+                    showDebugPanel(false);
                 }
+
             } catch (e) {
                 document.getElementById("error").innerText = "查询失败：" + e.message;
                 document.getElementById("error").style.display = "block";
+                showDebugPanel(true);
             } finally {
                 document.getElementById("loading").style.display = "none";
                 document.getElementById("queryBtn").disabled = false;
+            }
+        }
+
+        // 控制调试面板显示/折叠
+        function showDebugPanel(autoExpand) {
+            const panel = document.getElementById("debugPanel");
+            const body = document.getElementById("debugBody");
+            const arrow = document.getElementById("debugArrow");
+            
+            panel.style.display = "block";
+            if (autoExpand) {
+                body.classList.add("active");
+                arrow.textContent = "▲";
+            } else {
+                body.classList.remove("active");
+                arrow.textContent = "▼";
             }
         }
 
