@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CSV增量更新MySQL数据库（适配新数据结构版）
+CSV增量更新MySQL数据库（适配新数据结构版 + 主键冲突修复版）
 核心修改：
-1. 更新 TABLE_RULES 以匹配新的 CSV 结构（song_info/author_info/game_song_rel/song_author_rel）
-2. 移除旧字段，添加新字段（如 song_info 的"本家"、author_info 的"作者名"）
-3. 兼容 utf-8-sig 编码读取（防止Excel乱码带来的读取问题）
+1. 更新 TABLE_RULES 以匹配新的 CSV 结构
+2. 兼容 utf-8-sig 编码读取
+3. 🔥 修复主键冲突：新增同步使用 ON DUPLICATE KEY UPDATE
 """
 import os
 import sys
@@ -25,8 +25,7 @@ sys.path.insert(0, MAIN_PROJECT_ROOT)
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))
 from config.settings import CSV_TARGET_DIR, DB_CONFIG
 
-# ===================== 核心业务规则配置（已更新字段匹配新CSV） =====================
-# 1. 6张表的CSV路径
+# ===================== 核心业务规则配置 =====================
 CSV_PATHS = {
     "game_info": str(CSV_TARGET_DIR / "game_info.csv"),
     "song_info": str(CSV_TARGET_DIR / "song_info.csv"),
@@ -37,10 +36,7 @@ CSV_PATHS = {
 }
 
 TABLE_RULES = {
-    # 建表顺序（基础表在前，关联表在后）
     "create_order": ["game_info", "author_info", "song_info", "game_song_rel", "song_author_rel", "game_linkage_rel"],
-    
-    # 基础表：游戏信息表（保持不变）
     "game_info": {
         "primary_key": "游戏编号",
         "auto_cols": ["最新更新时间", "update_timestamp"],
@@ -58,44 +54,35 @@ TABLE_RULES = {
         },
         "foreign_keys": []
     },
-
-    # 基础表：作者信息表（已适配新结构）
-    # 新结构：author_id, 作者名, 别名, 备注, 最新更新时间
     "author_info": {
         "primary_key": "author_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": [],
         "field_types": {
             "author_id": "VARCHAR(50)",
-            "作者名": "VARCHAR(1000)",       # 旧：作者本名
-            "别名": "VARCHAR(500)",          # 旧：作者别称
+            "作者名": "VARCHAR(1000)",
+            "别名": "VARCHAR(500)",
             "备注": "VARCHAR(500)",
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
         },
         "foreign_keys": []
     },
-
-    # 基础表：歌曲信息表（已适配新结构）
-    # 新结构：song_id, 歌名, 别名, 作者, 本家, 最新更新时间
     "song_info": {
         "primary_key": "song_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
-        "date_cols": [],                   # 移除了旧的"歌曲更新时间"
+        "date_cols": [],
         "field_types": {
             "song_id": "VARCHAR(50)",
             "歌名": "VARCHAR(1000)",
-            "别名": "VARCHAR(1000)",        # 长度放宽以适应合并后的别名
-            "作者": "VARCHAR(1000)",         # 新增：名义作者
-            "本家": "VARCHAR(200)",         # 新增：本家字段
+            "别名": "VARCHAR(1000)",
+            "作者": "VARCHAR(1000)",
+            "本家": "VARCHAR(200)",
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
         },
         "foreign_keys": []
     },
-
-    # 关联表：游戏-歌曲关联表（已适配新结构）
-    # 新结构：rel_id, 游戏编号, song_id, 本家, 收录时间, 最新更新时间
     "game_song_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
@@ -104,16 +91,13 @@ TABLE_RULES = {
             "rel_id": "VARCHAR(200)",
             "游戏编号": "VARCHAR(100)",
             "song_id": "VARCHAR(50)",
-            "本家": "VARCHAR(200)",         # 新增：记录本家名称
+            "本家": "VARCHAR(200)",
             "收录时间": "DATE",
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
         },
         "foreign_keys": []
     },
-
-    # 关联表：歌曲-作者关联表（已适配新结构）
-    # 新结构：rel_id, song_id, author_id, 曲名, 作者名, 最新更新时间
     "song_author_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
@@ -122,15 +106,13 @@ TABLE_RULES = {
             "rel_id": "VARCHAR(100)",
             "song_id": "VARCHAR(50)",
             "author_id": "VARCHAR(50)",
-            "曲名": "VARCHAR(1000)",          # 新增：冗余核对字段
-            "作者名": "VARCHAR(1000)",         # 新增：冗余核对字段
+            "曲名": "VARCHAR(1000)",
+            "作者名": "VARCHAR(1000)",
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
         },
         "foreign_keys": []
     },
-
-    # 关联表：游戏联动表（保持原样，作为占位）
     "game_linkage_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
@@ -152,7 +134,7 @@ TABLE_RULES = {
     }
 }
 
-# ===================== 其他配置（保持不变） =====================
+# ===================== 其他配置 =====================
 TYPE_MAPPING = {
     "int64": "INT",
     "float64": "FLOAT",
@@ -182,9 +164,8 @@ def get_mysql_engine():
     )
     return create_engine(conn_str, pool_pre_ping=True, pool_recycle=3600)
 
-# ===================== 核心建表逻辑（已优化） =====================
+# ===================== 核心建表逻辑 =====================
 def generate_create_table_sql(table_name):
-    """基于 TABLE_RULES 生成建表 SQL"""
     table_rule = TABLE_RULES[table_name]
     fields = list(table_rule["field_types"].keys())
     
@@ -222,9 +203,8 @@ def init_all_tables():
         conn.commit()
     print("\n✅ 所有表初始化完成！")
 
-# ===================== CSV处理通用函数（已适配utf-8-sig） =====================
+# ===================== CSV处理通用函数 =====================
 def read_csv_with_encoding(csv_path):
-    """兼容读取 utf-8 和 utf-8-sig (Excel乱码修复版)"""
     try:
         return pd.read_csv(csv_path, encoding="utf-8-sig")
     except:
@@ -274,7 +254,7 @@ def save_processed_state(state):
     with open(STATE_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
-# ===================== 通用增量更新函数（适配动态字段） =====================
+# ===================== 通用增量更新函数（🔥 核心修复：主键冲突处理） =====================
 def incremental_update_single(table_name):
     if table_name not in CSV_PATHS or table_name not in TABLE_RULES:
         print(f"❌ 错误：不支持的表名 {table_name}")
@@ -295,7 +275,7 @@ def incremental_update_single(table_name):
     # CSV存档
     archive_csv(table_name, csv_path)
 
-    # 读取并预处理CSV（使用兼容读取）
+    # 读取并预处理CSV
     df = read_csv_with_encoding(csv_path)
     df = preprocess_data(df, table_name)
     if df.empty:
@@ -312,6 +292,7 @@ def incremental_update_single(table_name):
     # 数据库同步
     engine = get_mysql_engine()
     add_count = update_count = delete_count = 0
+    upsert_count = 0 # 新增：统计UPSERT数量
 
     with engine.connect() as conn:
         # 获取数据库主键列表
@@ -323,67 +304,76 @@ def incremental_update_single(table_name):
         delete_pk_list = [pk for pk in db_pk_list if pk not in csv_pk_list]
         
         if delete_pk_list:
-            # 安全拼接IN查询
             placeholders = ", ".join([f"'{pk}'" for pk in delete_pk_list])
             conn.execute(text(f"DELETE FROM {table_name} WHERE {primary_key} IN ({placeholders})"))
             delete_count = len(delete_pk_list)
             print(f"🗑️ 删除 {delete_count} 条{table_name}数据")
 
-        # 2. 新增同步
-        df_add = df[~df[primary_key].isin(db_pk_list)]
-        add_count = len(df_add)
-        if add_count > 0:
-            df_add.to_sql(table_name, engine, if_exists="append", index=False)
-            print(f"✅ 新增 {add_count} 条{table_name}数据")
-
-        # 3. 更新同步
-        df_update = df[df[primary_key].isin(db_pk_list)]
-        exclude_cols = rules["auto_cols"] + [primary_key]
-        update_count = 0
-
-        for idx, row in df_update.iterrows():
-            pk_value = row[primary_key]
-            # 使用 text() 和正确的参数绑定
-            db_row = conn.execute(text(f"SELECT * FROM {table_name} WHERE {primary_key} = :pk"), {"pk": pk_value}).fetchone()
-            if not db_row:
+        # 2. 🔥 核心修复：新增/更新同步 (UPSERT: ON DUPLICATE KEY UPDATE)
+        # 不再区分 df_add 和 df_update，统一使用 UPSERT 处理所有数据
+        # 这样既能解决主键冲突，又能自动更新旧数据
+        
+        # 获取字段列表（过滤掉不存在于CSV中的字段）
+        available_cols = [col for col in rules["field_types"].keys() if col in df.columns]
+        exclude_cols = rules["auto_cols"] # 自动更新的字段不强制覆盖
+        
+        # 构建 SQL 模板
+        cols_sql = ", ".join([f"`{col}`" for col in available_cols])
+        vals_sql = ", ".join([f":{col}" for col in available_cols])
+        
+        # 构建 ON DUPLICATE KEY UPDATE 部分
+        update_sql_parts = []
+        for col in available_cols:
+            if col == primary_key or col in exclude_cols:
                 continue
+            update_sql_parts.append(f"`{col}` = VALUES(`{col}`)")
+        
+        update_sql = ", ".join(update_sql_parts)
+        
+        # 完整的 UPSERT SQL
+        upsert_sql = text(f"""
+            INSERT INTO {table_name} ({cols_sql})
+            VALUES ({vals_sql})
+            ON DUPLICATE KEY UPDATE
+            {update_sql}
+        """)
 
-            db_dict = dict(zip(db_row.keys(), db_row))
-            row_dict = row.to_dict()
-            update_sql_parts = []
-            update_params = {}
-
-            for col in row_dict:
-                if col in exclude_cols or col not in db_dict:
-                    continue
+        # 批量执行 UPSERT
+        print(f"🔄 执行 {table_name} 数据同步 (UPSERT模式)...")
+        transaction = conn.begin()
+        try:
+            for idx, row in df.iterrows():
+                # 类型处理
+                row_dict = row.to_dict()
+                for k, v in row_dict.items():
+                    if isinstance(v, pd.Timestamp):
+                        row_dict[k] = v.date()
+                    if pd.isna(v):
+                        row_dict[k] = None
                 
-                db_val = db_dict[col]
-                csv_val = row_dict[col]
-                
-                # 类型兼容处理
-                if isinstance(csv_val, pd.Timestamp):
-                    csv_val = csv_val.date()
-                
-                # 只有值不同时才更新
-                if db_val != csv_val:
-                    update_sql_parts.append(f"`{col}` = :{col}")
-                    update_params[col] = csv_val
+                conn.execute(upsert_sql, row_dict)
+                upsert_count += 1
+            
+            transaction.commit()
+            
+            # 估算统计（因为UPSERT同时处理新增和更新，这里简化统计）
+            print(f"✅ {table_name} 同步完成！共处理 {upsert_count} 条数据（新增+更新合并）")
 
-            if update_sql_parts:
-                update_sql = f"UPDATE {table_name} SET {', '.join(update_sql_parts)} WHERE {primary_key} = :pk"
-                update_params["pk"] = pk_value
-                conn.execute(text(update_sql), update_params)
-                update_count += 1
+        except Exception as e:
+            transaction.rollback()
+            print(f"❌ {table_name} 同步失败：{str(e)}")
+            return False
 
-        conn.commit()
-        print(f"✏️ 更新 {update_count} 条{table_name}数据")
-        print(f"✅ {table_name} 同步完成！新增：{add_count} | 更新：{update_count} | 删除：{delete_count}")
+        # 3. (原有的逐行更新逻辑已移除，因为 UPSERT 已经包含了更新功能)
+        # 为了保持状态文件兼容，我们这里简单赋值
+        add_count = upsert_count
+        update_count = 0 
 
     # 保存状态
     processed_state[table_name] = {
         "md5": current_md5,
         "process_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "sync_stats": {"add": add_count, "update": update_count, "delete": delete_count}
+        "sync_stats": {"add": add_count, "update": update_count, "delete": delete_count, "upsert": upsert_count}
     }
     save_processed_state(processed_state)
     return True
@@ -418,9 +408,6 @@ def drop_all_tables():
 
 # ===================== 主函数 =====================
 def main():
-    # 注意：如果表结构已变更，建议先运行 python script.py clear 删表，再运行 init
-    # init_all_tables() # 移除自动init，防止误操作，改为手动命令控制更好
-
     if len(sys.argv) == 1:
         print("📖 使用说明：")
         print("  1. 初始化表结构：python3 脚本名.py init")
