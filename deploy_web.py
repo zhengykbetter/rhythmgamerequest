@@ -21,7 +21,8 @@ VENV_GUNICORN = "/opt/main_project/venv/bin/gunicorn"
 
 def run_cmd(cmd, desc):
     print(f"{COLORS['GREEN']}[INFO]{COLORS['NC']} {desc}")
-    subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.Popen(cmd, shell=True)
 
 if __name__ == "__main__":
     print(f"{COLORS['YELLOW']}===== RhythmGameQuery 自动化部署 (重构版) ====={COLORS['NC']}")
