@@ -1,22 +1,20 @@
 from flask import Blueprint, request, jsonify
 import time
+from sqlalchemy import text
 
-# 🔥 终极修复：只导入你llm_service中真实存在的函数
-from server.llm_service import llm_query, nl_to_sql
+# 🔥 唯一正确的导入（100%匹配你的文件）
+from server.llm_service import generate_sql
+from server.services.db_service import get_mysql_engine
 from server.services.issue_service import add_issue, load_issues
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
 @api_bp.route('/query', methods=['POST'])
 def query():
-    """
-    兼容你原生代码 + 保留调试信息面板功能
-    无任何导入错误，直接运行
-    """
     start_time = time.time()
     user_query = request.json.get('query', '').strip()
 
-    # 1. 基础参数校验
+    # 1. 参数校验
     if not user_query:
         return jsonify({
             "success": False,
@@ -31,8 +29,8 @@ def query():
 
     generated_sql = ""
     try:
-        # 2. 生成SQL（使用你原生的nl_to_sql函数）
-        generated_sql = nl_to_sql(user_query)
+        # 2. 生成 SQL（调用你真实的函数）
+        generated_sql = generate_sql(user_query)
         if not generated_sql:
             return jsonify({
                 "success": False,
@@ -45,10 +43,25 @@ def query():
                 "error_msg": "AI生成SQL失败，请更换提问方式"
             })
 
-        # 3. 执行原生查询逻辑
-        data = llm_query(user_query)
-        result_count = len(data)
-        execution_time = round(time.time() - start_time, 3)
+        # 3. 数据库执行 SQL
+        engine = get_mysql_engine()
+        if not engine:
+            return jsonify({
+                "success": False,
+                "user_query": user_query,
+                "generated_sql": generated_sql,
+                "execution_time": round(time.time() - start_time, 3),
+                "result_count": 0,
+                "data": [],
+                "error_stage": "DB_CONNECT",
+                "error_msg": "数据库连接失败"
+            })
+
+        with engine.connect() as conn:
+            result = conn.execute(text(generated_sql))
+            data = [dict(row) for row in result.mappings()]
+            result_count = len(data)
+            execution_time = round(time.time() - start_time, 3)
 
         # 4. 无数据场景
         if result_count == 0:
@@ -76,7 +89,6 @@ def query():
         })
 
     except Exception as e:
-        # 全局异常捕获
         execution_time = round(time.time() - start_time, 3)
         return jsonify({
             "success": False,
@@ -89,7 +101,7 @@ def query():
             "error_msg": f"查询失败：{str(e)}"
         })
 
-# ===================== 你的原生Issue接口（无任何改动） =====================
+# ===================== Issue 接口（完全保留，无改动） =====================
 @api_bp.route('/issues/submit', methods=['POST'])
 def submit_issue():
     try:
