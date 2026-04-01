@@ -29,15 +29,26 @@
         }
         h1 { color: #667eea; margin-bottom: 20px; text-align: center; }
         .text-content { line-height: 1.8; margin-bottom: 30px; color: #555; }
+        /* 优化后的统计数据展示区 */
         .stats-box {
-            background: #f5f7fa;
-            padding: 20px;
-            border-radius: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 16px;
             margin-bottom: 30px;
             text-align: center;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #667eea;
+            color: white;
+            box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+        }
+        .stats-box .stat-item {
+            display: inline-block;
+            margin: 0 30px;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        .stats-box .stat-value {
+            font-size: 2.5rem;
+            margin-bottom: 5px;
+            display: block;
         }
         .enter-btn {
             display: block;
@@ -60,7 +71,59 @@
             text-align: center;
             font-size: 0.9rem;
             margin-top: auto;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
+        .footer a {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            cursor: pointer;
+            transition: opacity 0.3s;
+        }
+        .footer a:hover { opacity: 0.8; }
+        /* Modal 样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h2 { color: #667eea; }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #888;
+            transition: color 0.3s;
+        }
+        .modal-close:hover { color: #333; }
+        .modal-body { line-height: 1.8; color: #555; }
     </style>
 </head>
 <body>
@@ -72,13 +135,56 @@
             <p style="margin-top: 15px; font-style: italic; color: #888;">(推荐阅读数据库约束界面，对本项目的数据库有更清晰的认识)</p>
         </div>
         <div class="stats-box">
-            已测试：{{ stats.total_tests }} 人次 | 
-            当前均分：{{ stats.avg_score | default('-', true) }} 分
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.total_tests }}</span>
+                已测试人次
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ stats.avg_score if stats.avg_score is not none else '-' }}</span>
+                当前均分
+            </div>
         </div>
         <a href="/benchmark/test" class="enter-btn" style="text-decoration: none; text-align: center;">进入测试</a>
     </div>
     <div class="footer">
-        © 2026 RhythmGameQuery. All rights reserved.
+        <a href="javascript:void(0)" onclick="openVersionModal()">Benchmark 版本说明</a>
+        <span>© 2026 RhythmGameQuery. All rights reserved.</span>
     </div>
+
+    <!-- 版本说明 Modal -->
+    <div class="modal-overlay" id="versionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Benchmark 版本说明</h2>
+                <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3 style="color: #667eea; margin-bottom: 10px;">v1.0</h3>
+                <ul style="margin-left: 20px; margin-bottom: 20px;">
+                    <li>初始版本，包含3道基础测试题</li>
+                    <li>支持查询、打分、提交功能</li>
+                    <li>支持统计数据展示</li>
+                    <li>支持独立 Benchmark Issue 提交</li>
+                </ul>
+                <p style="font-style: italic; color: #888;">后续版本将持续更新题库和功能，敬请期待！</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal 控制
+        function openVersionModal() {
+            document.getElementById('versionModal').classList.add('active');
+        }
+        function closeVersionModal() {
+            document.getElementById('versionModal').classList.remove('active');
+        }
+        // 点击遮罩关闭 Modal
+        document.getElementById('versionModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeVersionModal();
+            }
+        });
+    </script>
 </body>
 </html>

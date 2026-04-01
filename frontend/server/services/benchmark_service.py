@@ -119,3 +119,38 @@ def get_statistics():
     total_score_sum = sum([c["total_score"] for c in contributors])
     avg_score = round(total_score_sum / total_tests, 1)
     return {"total_tests": total_tests, "avg_score": avg_score}
+
+# ===================== Benchmark Issue 读写（新增） =====================
+def load_benchmark_issues():
+    json_path = os.path.join(DATA_DIR, "benchmark_issues.json")
+    if not os.path.exists(json_path):
+        return []
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"【错误】Benchmark Issue文件读取失败：{str(e)}")
+        return []
+
+def save_benchmark_issues(issues):
+    json_path = os.path.join(DATA_DIR, "benchmark_issues.json")
+    try:
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(issues, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"【错误】Benchmark Issue文件写入失败：{str(e)}")
+
+def add_benchmark_issue(name, contact, content, question_id=None, version="v1"):
+    issues = load_benchmark_issues()
+    new_issue = {
+        "id": len(issues) + 1,
+        "name": name.strip(),
+        "contact": contact.strip(),
+        "content": content.strip(),
+        "question_id": question_id,
+        "benchmark_version": version,
+        "submit_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    issues.append(new_issue)
+    save_benchmark_issues(issues)
+    return new_issue

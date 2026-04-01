@@ -28,19 +28,26 @@
             margin-bottom: 30px;
         }
         h1 { color: #667eea; margin-bottom: 30px; text-align: center; }
+        /* 优化后的题目样式 */
         .question-card {
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 1px solid #e0e0e0;
         }
+        .question-card.highlight {
+            background: #fff3f3;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #d32f2f;
+        }
         .question-title {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 1.1rem;
+            background: #e0e0e0; /* 更明显的灰底 */
+            padding: 18px;
+            border-radius: 10px;
+            font-size: 1.15rem;
             font-weight: 600;
             color: #333;
-            margin-bottom: 15px;
+            margin-bottom: 18px;
         }
         .query-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -56,7 +63,34 @@
         }
         .query-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
         .query-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
-        .result-box { margin-bottom: 15px; }
+        /* 可折叠面板样式（复用首页逻辑） */
+        .collapsible {
+            margin-bottom: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .collapsible-header {
+            background: #f5f7fa;
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #667eea;
+            transition: background 0.3s;
+        }
+        .collapsible-header:hover { background: #e8ecf1; }
+        .collapsible-header .arrow {
+            transition: transform 0.3s;
+        }
+        .collapsible-header.active .arrow { transform: rotate(180deg); }
+        .collapsible-content {
+            padding: 15px;
+            display: none;
+        }
+        .collapsible-content.active { display: block; }
         .result-table {
             width: 100%;
             border-collapse: collapse;
@@ -68,6 +102,16 @@
             text-align: left;
         }
         .result-table th { background: #f5f7fa; color: #667eea; }
+        .debug-info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.6;
+        }
+        /* 打分按钮样式（颜色区分） */
         .score-buttons {
             display: flex;
             gap: 10px;
@@ -103,6 +147,7 @@
             align-items: center;
             flex-wrap: wrap;
             gap: 15px;
+            z-index: 100;
         }
         .submit-bar .total-score {
             font-size: 1.2rem;
@@ -131,6 +176,112 @@
         }
         .submit-bar .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
         .submit-bar .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+        /* 浮窗 Issue 按钮 */
+        .floating-issue-btn {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+            transition: all 0.3s;
+            z-index: 99;
+        }
+        .floating-issue-btn:hover { transform: translateY(-2px); box-shadow: 0 15px 40px rgba(102,126,234,0.5); }
+        /* Modal 样式 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h2 { color: #667eea; }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #888;
+            transition: color 0.3s;
+        }
+        .modal-close:hover { color: #333; }
+        .modal-body .form-group {
+            margin-bottom: 15px;
+        }
+        .modal-body label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .modal-body input, .modal-body select, .modal-body textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        .modal-body input:focus, .modal-body select:focus, .modal-body textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .modal-body textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .modal-footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .modal-footer .btn {
+            padding: 10px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .modal-footer .btn-cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .modal-footer .btn-cancel:hover { background: #d0d0d0; }
+        .modal-footer .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .modal-footer .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(102,126,234,0.4); }
         .footer {
             color: rgba(255,255,255,0.9);
             text-align: center;
@@ -143,10 +294,29 @@
     <div class="container">
         <h1>Benchmark Test v1</h1>
         {% for q in questions %}
-        <div class="question-card" data-question-id="{{ q.id }}">
+        <div class="question-card" id="question-card-{{ q.id }}" data-question-id="{{ q.id }}">
             <div class="question-title">Q{{ q.id }}. {{ q.question }}</div>
-            <button class="query-btn" onclick="startQuery({{ q.id }}, '{{ q.question }}')">开始查询</button>
-            <div class="result-box" id="result-{{ q.id }}" style="display: none;"></div>
+            <button class="query-btn" id="query-btn-{{ q.id }}" onclick="startQuery({{ q.id }}, '{{ q.question }}')">开始查询</button>
+            
+            <!-- 可折叠的查询结果 -->
+            <div class="collapsible" id="result-collapsible-{{ q.id }}" style="display: none;">
+                <div class="collapsible-header" onclick="toggleCollapsible('result-collapsible-{{ q.id }}')">
+                    <span>📊 查询结果</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="collapsible-content" id="result-content-{{ q.id }}"></div>
+            </div>
+            
+            <!-- 可折叠的调试信息 -->
+            <div class="collapsible" id="debug-collapsible-{{ q.id }}" style="display: none;">
+                <div class="collapsible-header" onclick="toggleCollapsible('debug-collapsible-{{ q.id }}')">
+                    <span>🔧 调试信息</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="collapsible-content" id="debug-content-{{ q.id }}"></div>
+            </div>
+            
+            <!-- 打分按钮 -->
             <div class="score-buttons" id="score-{{ q.id }}" style="display: none;">
                 <button class="score-btn" data-score="-1" onclick="selectScore({{ q.id }}, -1)">-1</button>
                 <button class="score-btn" data-score="0" onclick="selectScore({{ q.id }}, 0)">0</button>
@@ -167,18 +337,88 @@
         <button class="submit-btn" id="submit-btn" onclick="submitTest()">提交测试</button>
     </div>
 
+    <!-- 浮窗 Issue 按钮 -->
+    <button class="floating-issue-btn" onclick="openIssueModal()">💬 提 Benchmark Issue</button>
+
+    <!-- Benchmark Issue Modal -->
+    <div class="modal-overlay" id="issueModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>提交 Benchmark Issue</h2>
+                <button class="modal-close" onclick="closeIssueModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="issue-question">关联题目（可选）</label>
+                    <select id="issue-question">
+                        <option value="">不关联特定题目</option>
+                        {% for q in questions %}
+                        <option value="{{ q.id }}">Q{{ q.id }}. {{ q.question }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="issue-name">称呼 *</label>
+                    <input type="text" id="issue-name" placeholder="请输入你的称呼">
+                </div>
+                <div class="form-group">
+                    <label for="issue-contact">联系方式（可选）</label>
+                    <input type="text" id="issue-contact" placeholder="邮箱/微信等">
+                </div>
+                <div class="form-group">
+                    <label for="issue-content">内容 *</label>
+                    <textarea id="issue-content" placeholder="请描述你的问题或建议"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeIssueModal()">取消</button>
+                <button class="btn btn-submit" onclick="submitIssue()">提交</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未署名确认 Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>确认放弃署名？</h2>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>你还没有输入名字，确认放弃署名吗？</p>
+                <p style="font-style: italic; color: #888; margin-top: 10px;">放弃署名后将无法成为永久 Contributor。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-cancel" onclick="closeConfirmModal()">返回填写</button>
+                <button class="btn btn-submit" onclick="confirmSubmit()">确认提交</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // 全局状态管理
         const benchmarkState = {
             questions: {{ questions | tojson }},
             scores: {}, // {题目id: 分数}
-            queryResults: {} // {题目id: {data, sql, error}}
+            queryResults: {}, // {题目id: {data, sql, error}}
+            queriedQuestions: new Set() // 已查询的题目id
         };
 
-        // 1. 开始查询
+        // 1. 可折叠面板控制
+        function toggleCollapsible(collapsibleId) {
+            const header = document.querySelector(`#${collapsibleId} .collapsible-header`);
+            const content = document.querySelector(`#${collapsibleId} .collapsible-content`);
+            header.classList.toggle('active');
+            content.classList.toggle('active');
+        }
+
+        // 2. 开始查询
         async function startQuery(questionId, questionText) {
-            const btn = document.querySelector(`[data-question-id="${questionId}"] .query-btn`);
-            const resultBox = document.getElementById(`result-${questionId}`);
+            const btn = document.getElementById(`query-btn-${questionId}`);
+            const resultCollapsible = document.getElementById(`result-collapsible-${questionId}`);
+            const debugCollapsible = document.getElementById(`debug-collapsible-${questionId}`);
+            const resultContent = document.getElementById(`result-content-${questionId}`);
+            const debugContent = document.getElementById(`debug-content-${questionId}`);
             const scoreBox = document.getElementById(`score-${questionId}`);
 
             // 按钮状态
@@ -194,7 +434,7 @@
                 });
                 const data = await response.json();
 
-                // 渲染查询结果（不折叠）
+                // 渲染查询结果
                 let resultHtml = "";
                 if (data.success && data.data.length > 0) {
                     resultHtml += `<h3 style="margin-bottom: 10px; color: #388e3c;">✅ 查询成功</h3>`;
@@ -216,25 +456,43 @@
                     resultHtml += `<h3 style="margin-bottom: 10px; color: #d32f2f;">❌ 查询失败</h3>`;
                     resultHtml += `<p style="color: #d32f2f;">${data.error_msg || '未知错误'}</p>`;
                 }
-                resultBox.innerHTML = resultHtml;
-                resultBox.style.display = "block";
+                resultContent.innerHTML = resultHtml;
+                resultCollapsible.style.display = "block";
+
+                // 渲染调试信息
+                let debugHtml = `<div class="debug-info">`;
+                debugHtml += `<p><strong>生成的 SQL：</strong></p>`;
+                debugHtml += `<pre style="background: white; padding: 10px; border-radius: 4px; margin: 5px 0;">${data.generated_sql || '无'}</pre>`;
+                debugHtml += `<p><strong>执行耗时：</strong>${data.execution_time || '-'} 秒</p>`;
+                if (data.error_msg) {
+                    debugHtml += `<p><strong>错误信息：</strong>${data.error_msg}</p>`;
+                }
+                if (data.error_stage) {
+                    debugHtml += `<p><strong>错误阶段：</strong>${data.error_stage}</p>`;
+                }
+                debugHtml += `</div>`;
+                debugContent.innerHTML = debugHtml;
+                debugCollapsible.style.display = "block";
 
                 // 显示打分按钮
                 scoreBox.style.display = "flex";
+
+                // 标记已查询
+                benchmarkState.queriedQuestions.add(questionId);
 
                 // 保存查询结果
                 benchmarkState.queryResults[questionId] = data;
 
             } catch (e) {
-                resultBox.innerHTML = `<h3 style="margin-bottom: 10px; color: #d32f2f;">❌ 查询失败</h3><p style="color: #d32f2f;">${e.message}</p>`;
-                resultBox.style.display = "block";
+                resultContent.innerHTML = `<h3 style="margin-bottom: 10px; color: #d32f2f;">❌ 查询失败</h3><p style="color: #d32f2f;">${e.message}</p>`;
+                resultCollapsible.style.display = "block";
             } finally {
                 btn.disabled = false;
                 btn.textContent = "重新查询";
             }
         }
 
-        // 2. 选择分数
+        // 3. 选择分数
         function selectScore(questionId, score) {
             // 更新状态
             benchmarkState.scores[questionId] = score;
@@ -248,29 +506,71 @@
                 }
             });
 
+            // 移除高亮
+            document.getElementById(`question-card-${questionId}`).classList.remove("highlight");
+
             // 更新总分
             updateTotalScore();
         }
 
-        // 3. 更新总分
+        // 4. 更新总分
         function updateTotalScore() {
             const totalScore = Object.values(benchmarkState.scores).reduce((sum, s) => sum + parseInt(s), 0);
             document.getElementById("total-score").textContent = totalScore;
         }
 
-        // 4. 提交测试
-        async function submitTest() {
-            const submitBtn = document.getElementById("submit-btn");
-            const nameInput = document.getElementById("name-input");
-
-            // 基础校验
+        // 5. 提交校验
+        function validateSubmission() {
             const allQuestionIds = benchmarkState.questions.map(q => q.id);
-            const answeredIds = Object.keys(benchmarkState.scores).map(id => parseInt(id));
-            const missingIds = allQuestionIds.filter(id => !answeredIds.includes(id));
-            if (missingIds.length > 0) {
-                alert(`请完成所有题目的查询和打分！未完成的题目：Q${missingIds.join(', Q')}`);
+            let isValid = true;
+
+            // 检查是否所有题目都已查询
+            allQuestionIds.forEach(id => {
+                const card = document.getElementById(`question-card-${id}`);
+                if (!benchmarkState.queriedQuestions.has(id)) {
+                    card.classList.add("highlight");
+                    isValid = false;
+                } else {
+                    card.classList.remove("highlight");
+                }
+            });
+
+            // 检查是否所有题目都已打分
+            allQuestionIds.forEach(id => {
+                const card = document.getElementById(`question-card-${id}`);
+                if (!benchmarkState.scores.hasOwnProperty(id)) {
+                    card.classList.add("highlight");
+                    isValid = false;
+                }
+            });
+
+            return isValid;
+        }
+
+        // 6. 提交测试
+        function submitTest() {
+            // 先校验
+            if (!validateSubmission()) {
+                alert("请完成所有题目的查询和打分！未完成的题目已高亮显示。");
                 return;
             }
+
+            // 检查是否署名
+            const nameInput = document.getElementById("name-input");
+            if (!nameInput.value.trim()) {
+                // 未署名，弹出确认 Modal
+                openConfirmModal();
+                return;
+            }
+
+            // 已署名，直接提交
+            doSubmit();
+        }
+
+        // 7. 执行实际提交
+        async function doSubmit() {
+            const submitBtn = document.getElementById("submit-btn");
+            const nameInput = document.getElementById("name-input");
 
             // 按钮状态
             submitBtn.disabled = true;
@@ -302,6 +602,84 @@
                 submitBtn.textContent = "提交测试";
             }
         }
+
+        // 8. 确认提交（未署名）
+        function confirmSubmit() {
+            closeConfirmModal();
+            doSubmit();
+        }
+
+        // ===================== Benchmark Issue Modal 控制 =====================
+        function openIssueModal() {
+            document.getElementById('issueModal').classList.add('active');
+        }
+        function closeIssueModal() {
+            document.getElementById('issueModal').classList.remove('active');
+            // 清空表单
+            document.getElementById('issue-question').value = '';
+            document.getElementById('issue-name').value = '';
+            document.getElementById('issue-contact').value = '';
+            document.getElementById('issue-content').value = '';
+        }
+        // 点击遮罩关闭 Modal
+        document.getElementById('issueModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeIssueModal();
+            }
+        });
+
+        // 9. 提交 Benchmark Issue
+        async function submitIssue() {
+            const questionId = document.getElementById('issue-question').value;
+            const name = document.getElementById('issue-name').value.trim();
+            const contact = document.getElementById('issue-contact').value.trim();
+            const content = document.getElementById('issue-content').value.trim();
+
+            // 基础校验
+            if (!name || !content) {
+                alert("请填写称呼和内容！");
+                return;
+            }
+
+            try {
+                const response = await fetch("/api/benchmark/issues/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: name,
+                        contact: contact,
+                        content: content,
+                        question_id: questionId ? parseInt(questionId) : null,
+                        version: "v1"
+                    })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    alert("Issue 提交成功！");
+                    closeIssueModal();
+                } else {
+                    alert(`提交失败：${data.error}`);
+                }
+
+            } catch (e) {
+                alert(`提交失败：${e.message}`);
+            }
+        }
+
+        // ===================== 未署名确认 Modal 控制 =====================
+        function openConfirmModal() {
+            document.getElementById('confirmModal').classList.add('active');
+        }
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').classList.remove('active');
+        }
+        // 点击遮罩关闭 Modal
+        document.getElementById('confirmModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeConfirmModal();
+            }
+        });
     </script>
 </body>
 </html>

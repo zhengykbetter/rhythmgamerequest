@@ -159,3 +159,29 @@ def submit_benchmark():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+# ===================== Benchmark 第二阶段接口：独立 Issue 提交 =====================
+@api_bp.route('/benchmark/issues/submit', methods=['POST'])
+def submit_benchmark_issue():
+    """
+    提交 Benchmark Issue
+    参数：name（必填）、contact（可选）、content（必填）、question_id（可选）、version（默认v1）
+    """
+    from server.services.benchmark_service import add_benchmark_issue
+    try:
+        data = request.json
+        name = data.get('name', '').strip()
+        contact = data.get('contact', '').strip()
+        content = data.get('content', '').strip()
+        question_id = data.get('question_id')
+        version = data.get('version', 'v1')
+
+        # 基础校验
+        if not name or not content:
+            return jsonify({"success": False, "error": "请填写称呼和内容"})
+        
+        # 保存 Issue
+        add_benchmark_issue(name, contact, content, question_id, version)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
