@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CSV增量更新MySQL数据库（适配新数据结构版 + 主键冲突修复版）
+CSV增量更新MySQL数据库（适配新数据结构版 + 主键冲突修复版 + 事务修复版）
 核心修改：
 1. 更新 TABLE_RULES 以匹配新的 CSV 结构
 2. 兼容 utf-8-sig 编码读取
-3. 🔥 修复主键冲突：新增同步使用 ON DUPLICATE KEY UPDATE
+3. 修复主键冲突：新增同步使用 ON DUPLICATE KEY UPDATE
+4. 🔥 修复 SQLAlchemy 2.0 事务管理问题
 """
 import os
 import sys
@@ -254,7 +255,7 @@ def save_processed_state(state):
     with open(STATE_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
 
-# ===================== 通用增量更新函数（🔥 核心修复：主键冲突处理） =====================
+# ===================== 通用增量更新函数（🔥 修复事务管理） =====================
 def incremental_update_single(table_name):
     if table_name not in CSV_PATHS or table_name not in TABLE_RULES:
         print(f"❌ 错误：不支持的表名 {table_name}")
@@ -291,31 +292,29 @@ def incremental_update_single(table_name):
 
     # 数据库同步
     engine = get_mysql_engine()
-    add_count = update_count = delete_count = 0
-    upsert_count = 0 # 新增：统计UPSERT数量
+    upsert_count = 0
 
-    with engine.connect() as conn:
-        # 获取数据库主键列表
+    # 🔥 修复：使用 with engine.begin() 自动管理事务
+    # 这样就不需要手动 begin/commit/rollback 了
+    with engine.begin() as conn:
+        # 1. 删除同步
         db_pk_result = conn.execute(text(f"SELECT {primary_key} FROM {table_name}")).fetchall()
         db_pk_list = [k[0] for k in db_pk_result]
 
-        # 1. 删除同步
         csv_pk_list = df[df[primary_key] != ""][primary_key].tolist()
         delete_pk_list = [pk for pk in db_pk_list if pk not in csv_pk_list]
         
+        delete_count = 0
         if delete_pk_list:
             placeholders = ", ".join([f"'{pk}'" for pk in delete_pk_list])
             conn.execute(text(f"DELETE FROM {table_name} WHERE {primary_key} IN ({placeholders})"))
             delete_count = len(delete_pk_list)
             print(f"🗑️ 删除 {delete_count} 条{table_name}数据")
 
-        # 2. 🔥 核心修复：新增/更新同步 (UPSERT: ON DUPLICATE KEY UPDATE)
-        # 不再区分 df_add 和 df_update，统一使用 UPSERT 处理所有数据
-        # 这样既能解决主键冲突，又能自动更新旧数据
-        
-        # 获取字段列表（过滤掉不存在于CSV中的字段）
+        # 2. 🔥 核心修复：UPSERT (ON DUPLICATE KEY UPDATE)
+        # 获取字段列表
         available_cols = [col for col in rules["field_types"].keys() if col in df.columns]
-        exclude_cols = rules["auto_cols"] # 自动更新的字段不强制覆盖
+        exclude_cols = rules["auto_cols"]
         
         # 构建 SQL 模板
         cols_sql = ", ".join([f"`{col}`" for col in available_cols])
@@ -331,49 +330,42 @@ def incremental_update_single(table_name):
         update_sql = ", ".join(update_sql_parts)
         
         # 完整的 UPSERT SQL
-        upsert_sql = text(f"""
-            INSERT INTO {table_name} ({cols_sql})
-            VALUES ({vals_sql})
-            ON DUPLICATE KEY UPDATE
-            {update_sql}
-        """)
+        if update_sql:
+            upsert_sql = text(f"""
+                INSERT INTO {table_name} ({cols_sql})
+                VALUES ({vals_sql})
+                ON DUPLICATE KEY UPDATE
+                {update_sql}
+            """)
+        else:
+            # 如果没有需要更新的字段（只有主键），则使用 INSERT IGNORE
+            upsert_sql = text(f"""
+                INSERT IGNORE INTO {table_name} ({cols_sql})
+                VALUES ({vals_sql})
+            """)
 
         # 批量执行 UPSERT
         print(f"🔄 执行 {table_name} 数据同步 (UPSERT模式)...")
-        transaction = conn.begin()
-        try:
-            for idx, row in df.iterrows():
-                # 类型处理
-                row_dict = row.to_dict()
-                for k, v in row_dict.items():
-                    if isinstance(v, pd.Timestamp):
-                        row_dict[k] = v.date()
-                    if pd.isna(v):
-                        row_dict[k] = None
-                
-                conn.execute(upsert_sql, row_dict)
-                upsert_count += 1
+        
+        for idx, row in df.iterrows():
+            # 类型处理
+            row_dict = row.to_dict()
+            for k, v in row_dict.items():
+                if isinstance(v, pd.Timestamp):
+                    row_dict[k] = v.date()
+                if pd.isna(v):
+                    row_dict[k] = None
             
-            transaction.commit()
-            
-            # 估算统计（因为UPSERT同时处理新增和更新，这里简化统计）
-            print(f"✅ {table_name} 同步完成！共处理 {upsert_count} 条数据（新增+更新合并）")
+            conn.execute(upsert_sql, row_dict)
+            upsert_count += 1
 
-        except Exception as e:
-            transaction.rollback()
-            print(f"❌ {table_name} 同步失败：{str(e)}")
-            return False
-
-        # 3. (原有的逐行更新逻辑已移除，因为 UPSERT 已经包含了更新功能)
-        # 为了保持状态文件兼容，我们这里简单赋值
-        add_count = upsert_count
-        update_count = 0 
+        print(f"✅ {table_name} 同步完成！共处理 {upsert_count} 条数据（删除：{delete_count}）")
 
     # 保存状态
     processed_state[table_name] = {
         "md5": current_md5,
         "process_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "sync_stats": {"add": add_count, "update": update_count, "delete": delete_count, "upsert": upsert_count}
+        "sync_stats": {"upsert": upsert_count, "delete": delete_count}
     }
     save_processed_state(processed_state)
     return True
