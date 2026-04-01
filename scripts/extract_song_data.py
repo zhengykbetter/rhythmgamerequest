@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-歌曲数据提取脚本 V3.1（逻辑修复版）
+歌曲数据提取脚本 V4.0（集成 unitoken.csv 统一逻辑）
 ✅ 正确逻辑：
-1. Song表：按【歌名Token+作者Token集合】去重（唯一歌曲）
-2. GameSongRel表：保留所有游戏收录记录，关联去重后song_id
-3. Author表：按作者Token去重，模糊作者自动合并
-4. 三者数量关系：Rel ≥ Song，Author为去重后作者数
+1. 读取 unitoken.csv 统一作者Token
+2. Song表：按【歌名Token+统一作者Token集合】去重（唯一歌曲）
+3. GameSongRel表：保留所有游戏收录记录，关联去重后song_id
+4. Author表：按【统一作者Token】去重，模糊作者自动合并
+5. 三者数量关系：Rel ≥ Song，Author为去重后作者数
 """
 import os
 import sys
@@ -23,7 +24,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ===================== 路径配置 =====================
+# ===================== 路径配置（新增 unitoken.csv） =====================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, MAIN_PROJECT_ROOT)
@@ -36,6 +37,7 @@ from config.settings import (
 
 RAW_SONG_CSV_PATH = os.path.join(CSV_TARGET_DIR, RAW_SONG_CSV_FILENAME)
 SONG_TOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "songtoken.csv")
+UNITOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "unitoken.csv")  # 新增：统一Token表
 
 OUTPUT_PATHS = {
     "song_info": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["song_info"]),
@@ -88,26 +90,43 @@ def parse_author_tokens(token_str):
         return []
 
 def merge_aliases(existing, new):
-    """合并别名：去重后用斜杠连接
-    修复：兼容空值/NaN/float类型
-    """
-    # 核心修复：先强制清洗为字符串，杜绝float/NaN报错
+    """合并别名：去重后用斜杠连接"""
     existing = clean_string(existing)
     new = clean_string(new)
-    
     if existing == "":
         return new
     if new == "":
         return existing
-    
-    # 简单分割去重
     set_existing = set([x.strip() for x in existing.split("/") if x.strip()])
     set_new = set([x.strip() for x in new.split("/") if x.strip()])
-    
     merged = sorted(list(set_existing.union(set_new)))
     return " / ".join(merged)
-# ===================== 核心业务逻辑 =====================
-def extract_song_data_v3():
+
+# ===================== 新增：unitoken.csv 读取与映射构建 =====================
+def build_unitoken_map(unitoken_path):
+    """
+    读取 unitoken.csv，构建【原始作者Token → 统一作者Token】的映射
+    如果原始Token不在映射中，则返回自身
+    """
+    if not os.path.exists(unitoken_path):
+        logger.warning(f"unitoken.csv 不存在，将使用原始作者Token")
+        return {}
+    
+    try:
+        df_unitoken = pd.read_csv(unitoken_path, encoding="utf-8-sig", dtype=str)
+        unitoken_map = dict(zip(df_unitoken["原始Token"], df_unitoken["统一Token"]))
+        logger.info(f"✅ 成功读取 unitoken.csv：共 {len(unitoken_map)} 条统一映射")
+        return unitoken_map
+    except Exception as e:
+        logger.error(f"读取 unitoken.csv 失败：{str(e)}，将使用原始作者Token")
+        return {}
+
+def get_unified_token(original_token, unitoken_map):
+    """获取统一后的作者Token，无映射则返回原始Token"""
+    return unitoken_map.get(original_token, original_token)
+
+# ===================== 核心业务逻辑（集成 unitoken） =====================
+def extract_song_data_v4():
     # 1. 读取数据
     if not os.path.exists(RAW_SONG_CSV_PATH):
         logger.error(f"原始文件不存在 → {RAW_SONG_CSV_PATH}")
@@ -120,33 +139,40 @@ def extract_song_data_v3():
     df_token = pd.read_csv(SONG_TOKEN_CSV_PATH, encoding="utf-8-sig", dtype=str)
     df_raw = df_raw.merge(df_token[["song_id", "歌名token", "作者token"]], on="song_id", how="left")
 
+    # 2. 读取 unitoken 映射
+    logger.info("读取 unitoken.csv 统一作者Token...")
+    unitoken_map = build_unitoken_map(UNITOKEN_CSV_PATH)
+
     # 清洗
     for col in ["song_id", "歌名", "作者", "真实作者", "歌名token", "作者token"]:
         df_raw[col] = df_raw[col].apply(clean_string)
     df_raw = df_raw[df_raw["song_id"] != ""].reset_index(drop=True)
 
-    # 2. 初始化存储
-    song_map = {}              # Key: (歌名token, 作者token集合) → 唯一歌曲
-    author_token_map = {}      # Key: 作者token → 唯一作者
+    # 3. 初始化存储
+    song_map = {}              # Key: (歌名token, 统一作者token集合) → 唯一歌曲
+    author_token_map = {}      # Key: 统一作者token → 唯一作者
     song_id_counter = 1
     author_id_counter = 999999
     current_time = get_current_datetime()
 
-    # ===================== 第一轮：构建去重后的歌曲&作者 =====================
-    logger.info("构建唯一歌曲/作者库（Token模糊去重）...")
+    # ===================== 第一轮：构建去重后的歌曲&作者（使用统一Token） =====================
+    logger.info("构建唯一歌曲/作者库（统一Token模糊去重）...")
     for _, row in df_raw.iterrows():
         song_name = row["歌名"]
         nominal_author = row["作者"]
         song_token = row["歌名token"]
-        auth_tokens = parse_author_tokens(row["作者token"])
+        
+        # 解析原始作者Token，并替换为统一Token
+        original_auth_tokens = parse_author_tokens(row["作者token"])
+        unified_auth_tokens = [get_unified_token(tok, unitoken_map) for tok in original_auth_tokens]
         real_authors = parse_real_authors(row["真实作者"]) or [nominal_author]
 
         # 基础过滤
-        if not song_token or not auth_tokens or not song_name:
+        if not song_token or not unified_auth_tokens or not song_name:
             continue
         
-        # 歌曲唯一KEY（核心：模糊去重，无视游戏）
-        song_key = (song_token, frozenset(auth_tokens))
+        # 歌曲唯一KEY（使用统一作者Token）
+        song_key = (song_token, frozenset(unified_auth_tokens))
 
         # ============== 歌曲去重：多游戏收录同一首歌，只存一次 ==============
         if song_key not in song_map:
@@ -166,21 +192,20 @@ def extract_song_data_v3():
             existing_home = clean_string(song["本家"])
             new_home = clean_string(row["本家"])
 
-            # 只有：两个都不为空 且 不相等 → 才报冲突（修复NaN问题）
             if existing_home and new_home and existing_home != new_home:
                 logger.error(f"本家冲突 | 歌曲:{song_name} | {existing_home} vs {new_home}")
-            # 只有：新本家不为空，旧本家为空 → 才更新
             elif not existing_home and new_home:
                 song["本家"] = new_home
 
-        # ============== 作者去重：按作者Token，模糊作者合并 ==============
-        for a_name, a_tok in zip(real_authors, auth_tokens):
-            if not a_tok:
+        # ============== 作者去重：按【统一作者Token】，模糊作者合并 ==============
+        for a_name, original_a_tok in zip(real_authors, original_auth_tokens):
+            unified_a_tok = get_unified_token(original_a_tok, unitoken_map)
+            if not unified_a_tok:
                 continue
-            if a_tok not in author_token_map:
+            if unified_a_tok not in author_token_map:
                 aid = f"{author_id_counter:06d}"
                 author_id_counter -= 1
-                author_token_map[a_tok] = {
+                author_token_map[unified_a_tok] = {
                     "author_id": aid,
                     "作者名": a_name
                 }
@@ -197,13 +222,16 @@ def extract_song_data_v3():
         game = row["来源"]
         date = row["更新时间"]
         song_token = row["歌名token"]
-        auth_tokens = parse_author_tokens(row["作者token"])
+        
+        # 再次解析并统一作者Token（确保一致性）
+        original_auth_tokens = parse_author_tokens(row["作者token"])
+        unified_auth_tokens = [get_unified_token(tok, unitoken_map) for tok in original_auth_tokens]
         real_authors = parse_real_authors(row["真实作者"]) or [row["作者"]]
 
-        if not song_token or not auth_tokens:
+        if not song_token or not unified_auth_tokens:
             continue
         
-        song_key = (song_token, frozenset(auth_tokens))
+        song_key = (song_token, frozenset(unified_auth_tokens))
         if song_key not in song_map:
             continue
         
@@ -221,11 +249,12 @@ def extract_song_data_v3():
                 "最新更新时间": current_time
             })
 
-        # ============== 歌曲-作者关联 ==============
-        for a_name, a_tok in zip(real_authors, auth_tokens):
-            if a_tok not in author_token_map:
+        # ============== 歌曲-作者关联（使用统一作者Token） ==============
+        for a_name, original_a_tok in zip(real_authors, original_auth_tokens):
+            unified_a_tok = get_unified_token(original_a_tok, unitoken_map)
+            if unified_a_tok not in author_token_map:
                 continue
-            aid = author_token_map[a_tok]["author_id"]
+            aid = author_token_map[unified_a_tok]["author_id"]
             if (internal_sid, aid) not in sa_pairs:
                 sa_pairs.add((internal_sid, aid))
                 song_author_rel.append({
@@ -244,7 +273,7 @@ def extract_song_data_v3():
     df_song = df_song[["song_id", "歌名", "别名", "作者", "本家", "最新更新时间"]]
     df_song.to_csv(OUTPUT_PATHS["song_info"], encoding="utf-8-sig", index=False)
 
-    # 作者表（去重后唯一作者）
+    # 作者表（去重后唯一作者，基于统一Token）
     df_author = pd.DataFrame(author_token_map.values()).sort_values("author_id", ascending=False)
     df_author["别名"] = ""
     df_author["备注"] = ""
@@ -263,13 +292,13 @@ def extract_song_data_v3():
 
     # ===================== 最终输出3张表数量（正确逻辑） =====================
     logger.info("="*60)
-    logger.info(f"✅ 作者表(author_info)：{len(df_author):,} 条")
-    logger.info(f"✅ 歌曲表(song_info)：{len(df_song):,} 条")
+    logger.info(f"✅ 作者表(author_info)：{len(df_author):,} 条（基于统一Token去重）")
+    logger.info(f"✅ 歌曲表(song_info)：{len(df_song):,} 条（基于统一作者Token查重）")
     logger.info(f"✅ 游戏歌曲关联表(game_song_rel)：{len(df_gs_rel):,} 条")
     logger.info("="*60)
-    logger.info("🎉 逻辑修复完成，数量关系完全符合业务规则！")
+    logger.info("🎉 unitoken 集成完成，数量关系完全符合业务规则！")
     return True
 
 if __name__ == "__main__":
     os.makedirs(CSV_TARGET_DIR, exist_ok=True)
-    extract_song_data_v3()
+    extract_song_data_v4()
