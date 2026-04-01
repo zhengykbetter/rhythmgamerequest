@@ -417,7 +417,7 @@
                         <span class="stat-icon">📊</span>
                         <div class="stat-text">
                             <div class="stat-label">收录信息</div>
-                            <div class="stat-value">6,455</div>
+                            <div class="stat-value">{{ "{:,}".format(info_count) }}</div>
                         </div>
                     </div>
                     <div class="stat-divider"></div>
@@ -425,7 +425,7 @@
                         <span class="stat-icon">🎵</span>
                         <div class="stat-text">
                             <div class="stat-label">歌曲</div>
-                            <div class="stat-value">5,483</div>
+                            <div class="stat-value">{{ "{:,}".format(song_count) }}</div>
                         </div>
                     </div>
                     <div class="stat-divider"></div>
@@ -433,7 +433,7 @@
                         <span class="stat-icon">🎹</span>
                         <div class="stat-text">
                             <div class="stat-label">曲师</div>
-                            <div class="stat-value">3,108</div>
+                            <div class="stat-value">{{ "{:,}".format(artist_count) }}</div>
                         </div>
                     </div>
                 </div>
