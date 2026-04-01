@@ -17,12 +17,11 @@ if str(MAIN_PROJECT_ROOT) not in sys.path:
 
 # 3. 正确导入：DB_CONFIG，不是 MYSQL_CONFIG
 try:
-    from config.settings import DB_CONFIG, TABLE_RULES
+    from config.settings import DB_CONFIG
     # print(f"[DEBUG] 导入成功: {DB_CONFIG}")
 except ImportError as e:
     print(f"[DEBUG] 导入失败: {e}")
     DB_CONFIG = {}
-    TABLE_RULES = {}
 
 # ===================== 数据库基础函数 =====================
 def get_mysql_engine():
