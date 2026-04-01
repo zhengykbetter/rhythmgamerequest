@@ -25,7 +25,7 @@ def load_questions(version="v1"):
     
     questions = []
     with open(csv_path, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f, delimiter="\t") # 严格按你给的制表符分隔
+        reader = csv.DictReader(f, delimiter=",")
         for row in reader:
             try:
                 questions.append({
