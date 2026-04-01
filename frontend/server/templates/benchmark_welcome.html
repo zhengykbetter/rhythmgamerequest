@@ -73,7 +73,7 @@
         </div>
         <div class="stats-box">
             已测试：{{ stats.total_tests }} 人次 | 
-            当前均分：{{ stats.avg_score if stats.avg_score is not None else '-' }} 分
+            当前均分：{{ stats.avg_score | default('-', true) }} 分
         </div>
         <a href="/benchmark/test" class="enter-btn" style="text-decoration: none; text-align: center;">进入测试</a>
     </div>
