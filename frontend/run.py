@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -8,6 +9,9 @@ FILE = Path(__file__).resolve()
 FRONTEND_ROOT = FILE.parent
 # 定位到主项目根目录 (main_project)，因为 config 在那里
 MAIN_PROJECT_ROOT = FRONTEND_ROOT.parent
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
 
 # 将这两个目录都加入 sys.path，确保能找到所有模块
 if str(FRONTEND_ROOT) not in sys.path:

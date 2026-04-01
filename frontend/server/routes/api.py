@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 import time
 from sqlalchemy import text
-from server.services.llm_service import generate_sql
+from main.services.llm_service import generate_sql
 from server.services.db_service import get_mysql_engine
 from server.services.issue_service import add_issue
 
