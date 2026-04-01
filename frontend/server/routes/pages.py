@@ -19,12 +19,10 @@ def benchmark_welcome():
 
 @pages_bp.route('/benchmark/test')
 def benchmark_test():
-    """
-    Benchmark 第一阶段：测试页
-    包含：所有题目、查询、打分、底部总分署名提交
-    """
     from server.services.benchmark_service import load_questions
     questions = load_questions(version="v1")
+    # 新增：打印加载到的题目，终端会直接输出
+    print(f"【调试】加载到的题目列表：{questions}")
     return render_template('benchmark_test.html', questions=questions)
 
 # ===================== 新增：独立的 Issues 页面（完整保留你的原有代码） =====================
