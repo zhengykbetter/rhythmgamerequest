@@ -536,42 +536,48 @@
                     </div>
                 </div>
                 <!-- ===================================================================== -->
+<div class="info-row">
+    <div class="info-card">
+        <h3>往年今日</h3>
+        <div id="yearTodayResult" style="font-size:1rem;margin-top:10px;line-height:1.6;"></div>
+    </div>
+    <div class="info-card">
+        <h3>本地时间</h3>
+        <p id="localTime" style="font-size:1.2rem;"></p>
+    </div>
+    <div class="info-card">
+        <h3>累计访问</h3>
+        <p>{{ visit_count }} 人次</p>
+    </div>
+</div>
 
-                <div class="info-row">
-                <div class="info-card">
-                    <h3>往年今日</h3>
-                    <div id="yearTodayResult" style="font-size:1rem;margin-top:10px;line-height:1.6;"></div>
-                </div>
-
-<!-- 往年今日 自动加载JS（不影响任何原有JS） -->
+<!-- 🔥 修复：无冲突JS，绝对能发送请求 -->
 <script>
-// 页面加载完成后自动请求数据
-window.onload = function() {
+// 不用onload，直接执行，避免被覆盖
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("✅ 往年今日JS启动，开始请求数据");
     fetch('/api/year-today')
     .then(res => res.json())
     .then(res => {
+        console.log("📊 接口返回数据：", res);
         const resultDiv = document.getElementById('yearTodayResult');
         if (!res.success || res.data.length === 0) {
             resultDiv.innerHTML = '暂无历史数据';
             return;
         }
-        // 拼接文案
         let html = '';
-        res.data.forEach(item => {
-            if (item.是否原创 === 1) {
-                html += `${item.收录年份}年，${item.游戏名称}发布了原创歌曲：曲师${item.曲师}的《${item.歌曲名称}》<br>`;
-            } else {
-                html += `${item.收录年份}年，${item.游戏名称}收录了歌曲：曲师${item.曲师}的《${item.歌曲名称}》<br>`;
-            }
+        res.data.forEach(text => {
+            html += text + '<br>';
         });
         resultDiv.innerHTML = html;
     })
     .catch(err => {
+        console.error("❌ 请求失败：", err);
         document.getElementById('yearTodayResult').innerHTML = '数据加载失败';
-        console.error(err);
     });
-};
+});
 </script>
+
                     <div class="info-card">
                         <h3>本地时间</h3>
                         <p id="localTime" style="font-size:1.2rem;"></p>
