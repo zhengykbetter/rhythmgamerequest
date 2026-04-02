@@ -57,3 +57,10 @@ def get_history_today_data():
 def save_cache(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+# ===================== 强制生成缓存（手动运行，必创建文件） =====================
+if __name__ == '__main__':
+    print("🔥 手动强制生成往年今日缓存...")
+    result = get_history_today_data()
+    print(f"✅ 生成完成！数据：{result}")
+    print(f"📁 缓存文件已自动创建")
