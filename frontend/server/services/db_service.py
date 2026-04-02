@@ -55,7 +55,7 @@ def get_dashboard_stats():
     except Exception as e:
         print(f"[DB Error] {e}")
         return {'info_count': 11, 'song_count': 45, 'artist_count': 14}
-# ===================== 往年今日 - 核心数据库查询（完全兼容你的项目） =====================
+# ===================== 往年今日 - 核心数据库查询（修复版·英文字段） =====================
 def get_year_today_songs():
     engine = get_mysql_engine()
     if not engine:
@@ -63,18 +63,19 @@ def get_year_today_songs():
 
     try:
         with engine.connect() as conn:
+            # 🔥 唯一修改：全部用英文字段名，彻底解决undefined问题
             sql = text("""
                 SELECT
-                  YEAR(g.收录时间) AS 收录年份,
-                  g.游戏编号 AS 游戏名称,
-                  CASE WHEN g.本家 = g.游戏编号 THEN 1 ELSE 0 END AS 是否原创,
-                  s.作者 AS 曲师,
-                  s.歌名 AS 歌曲名称
+                  YEAR(g.收录时间) AS year,
+                  g.游戏编号 AS game,
+                  CASE WHEN g.本家 = g.游戏编号 THEN 1 ELSE 0 END AS is_original,
+                  s.作者 AS author,
+                  s.歌名 AS song
                 FROM game_song_rel g
                 JOIN song_info s ON g.song_id = s.song_id
                 WHERE MONTH(g.收录时间) = MONTH(CURDATE())
                   AND DAY(g.收录时间) = DAY(CURDATE())
-                ORDER BY 是否原创 DESC, g.收录时间 DESC
+                ORDER BY is_original DESC, g.收录时间 DESC
             """)
             result = conn.execute(sql)
             data_list = [dict(row) for row in result]

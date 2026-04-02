@@ -42,19 +42,16 @@ def get_history_today_data():
     # 4. 按你的规则拼接文案（核心逻辑）
     result_list = []
     for item in raw_data:
-        year = item["收录年份"]
-        game = item["游戏名称"]
-        author = item["曲师"]
-        song = item["歌曲名称"]
-        is_original = item["是否原创"]
+        year = item["year"]  # 英文
+        game = item["game"] # 英文
+        author = item["author"] # 英文
+        song = item["song"] # 英文
+        is_original = item["is_original"] # 英文
 
         if is_original == 1:
-            # 原创歌曲文案
             text = f"{year}年，{game}发布了原创歌曲：曲师{author}的《{song}》"
         else:
-            # 收录歌曲文案
             text = f"{year}年，{game}收录了歌曲：曲师{author}的《{song}》"
-        
         result_list.append(text)
 
     # 5. 保存缓存（永久保存，不删除）
