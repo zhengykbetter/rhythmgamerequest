@@ -185,3 +185,20 @@ def submit_benchmark_issue():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
+# ===================== 往年今日 专属接口（最终版） =====================
+@api_bp.route('/year-today', methods=['GET'])
+def year_today():
+    try:
+        # 调用新的服务层（唯一改动点）
+        from server.services.history_today_service import get_history_today_data
+        data = get_history_today_data()
+        return jsonify({
+            "success": True,
+            "data": data
+        })
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "data": ["数据加载失败，请稍后重试"]
+        })

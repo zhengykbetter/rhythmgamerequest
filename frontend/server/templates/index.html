@@ -538,11 +538,40 @@
                 <!-- ===================================================================== -->
 
                 <div class="info-row">
-                    <div class="info-card">
-                        <h3>今日运势</h3>
-                        <button onclick="showLuck()" style="background:#667eea;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">查看运势</button>
-                        <p id="luckResult" style="font-size:1rem;margin-top:10px;"></p>
-                    </div>
+                <div class="info-card">
+                    <h3>往年今日</h3>
+                    <div id="yearTodayResult" style="font-size:1rem;margin-top:10px;line-height:1.6;"></div>
+                </div>
+
+<!-- 往年今日 自动加载JS（不影响任何原有JS） -->
+<script>
+// 页面加载完成后自动请求数据
+window.onload = function() {
+    fetch('/api/year-today')
+    .then(res => res.json())
+    .then(res => {
+        const resultDiv = document.getElementById('yearTodayResult');
+        if (!res.success || res.data.length === 0) {
+            resultDiv.innerHTML = '暂无历史数据';
+            return;
+        }
+        // 拼接文案
+        let html = '';
+        res.data.forEach(item => {
+            if (item.是否原创 === 1) {
+                html += `${item.收录年份}年，${item.游戏名称}发布了原创歌曲：曲师${item.曲师}的《${item.歌曲名称}》<br>`;
+            } else {
+                html += `${item.收录年份}年，${item.游戏名称}收录了歌曲：曲师${item.曲师}的《${item.歌曲名称}》<br>`;
+            }
+        });
+        resultDiv.innerHTML = html;
+    })
+    .catch(err => {
+        document.getElementById('yearTodayResult').innerHTML = '数据加载失败';
+        console.error(err);
+    });
+};
+</script>
                     <div class="info-card">
                         <h3>本地时间</h3>
                         <p id="localTime" style="font-size:1.2rem;"></p>
