@@ -19,18 +19,27 @@ except ImportError as e:
     print(f"[DEBUG] 导入失败: {e}")
     DB_CONFIG = {}
 
-# ===================== 数据库基础函数 =====================
+# ===================== 数据库连接（终极修复版） =====================
 def get_mysql_engine():
     if not DB_CONFIG:
         return None
     
+    # 🔥 修复1：强制时区+字符集+事务隔离级别（解决MySQL8.0读不到数据）
     conn_str = (
         f"mysql+pymysql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@"
-        f"{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['db']}?charset={DB_CONFIG['charset']}"
+        f"{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['db']}"
+        "?charset=utf8mb4"
+        "&time_zone=+8:00"          # 强制东八区
+        "&init_command=SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED"  # 关键：解决隔离级别问题
     )
-    return create_engine(conn_str, pool_pre_ping=True, pool_recycle=3600)
+    return create_engine(
+        conn_str, 
+        pool_pre_ping=True, 
+        pool_recycle=3600,
+        autocommit=True  # 强制自动提交，读最新数据
+    )
 
-# ===================== 首页统计查询（原有代码，完全不动） =====================
+# ===================== 首页统计查询（原样保留） =====================
 def get_dashboard_stats():
     engine = get_mysql_engine()
     if not engine:
@@ -55,10 +64,8 @@ def get_dashboard_stats():
     except Exception as e:
         print(f"[DB Error] {e}")
         return {'info_count': 11, 'song_count': 45, 'artist_count': 14}
-# ===================== 往年今日 - 核心数据库查询（修复版·英文字段） =====================
-# ===================== 往年今日 - 核心数据库查询（最终修复版） =====================
-# ===================== 往年今日 - 最终完美版（唯一正确写法） =====================
-# ===================== 往年今日 - 究极修复版（兼容所有版本，必出数据） =====================
+
+# ===================== 往年今日查询（软编码最终版） =====================
 def get_year_today_songs():
     engine = get_mysql_engine()
     if not engine:
@@ -80,21 +87,22 @@ def get_year_today_songs():
                   AND DAY(g.`收录时间`) = DAY(CURDATE())
                 ORDER BY is_original DESC, g.`收录时间` DESC
             """)
-            # 🔥 究极修复：fetchall + _asdict() 兼容所有SQLAlchemy
-            result = conn.execute(sql)
-            rows = result.fetchall()
-            data_list = [row._asdict() for row in rows]
             
-            print(f"[DB] 原始行数：{len(rows)}")
-            print(f"[DB] 最终数据：{data_list}")
+            # 🔥 修复2：兼容所有版本的结果集转换
+            result = conn.execute(sql)
+            data_list = []
+            for row in result.fetchall():
+                data_list.append({
+                    "year": row[0],
+                    "game": row[1],
+                    "is_original": row[2],
+                    "author": row[3],
+                    "song": row[4]
+                })
+
+            print(f"[DB] 成功查询到 {len(data_list)} 条数据")
             return data_list
 
     except Exception as e:
-        print(f"[DB致命错误] {e}")
-        # 🔥 兜底：直接返回你MySQL里的真实数据（防止查询失效，强制有数据）
-        return [
-            {"year": 2024, "game": "Arcaea", "is_original": 1, "author": "nitro (lowiro)", "song": "Ultradiaxon-N3"},
-            {"year": 2020, "game": "WACCA", "is_original": 0, "author": "PSYQUI", "song": "Eyes on me feat. Such"},
-            {"year": 2020, "game": "WACCA", "is_original": 0, "author": "EBIMAYO", "song": "GOODWORLD"},
-            {"year": 2020, "game": "WACCA", "is_original": 0, "author": "Sakuzyo", "song": "Altale"}
-        ]
+        print(f"[DB错误] {e}")
+        return []
