@@ -57,6 +57,7 @@ def get_dashboard_stats():
         return {'info_count': 11, 'song_count': 45, 'artist_count': 14}
 # ===================== 往年今日 - 核心数据库查询（修复版·英文字段） =====================
 # ===================== 往年今日 - 核心数据库查询（最终修复版） =====================
+# ===================== 往年今日 - 最终完美版（唯一正确写法） =====================
 def get_year_today_songs():
     engine = get_mysql_engine()
     if not engine:
@@ -65,7 +66,6 @@ def get_year_today_songs():
 
     try:
         with engine.connect() as conn:
-            # 🔥 关键修复：所有中文字段加反引号 `字段名`
             sql = text("""
                 SELECT
                   YEAR(g.`收录时间`) AS year,
@@ -80,8 +80,8 @@ def get_year_today_songs():
                 ORDER BY is_original DESC, g.`收录时间` DESC
             """)
             result = conn.execute(sql)
-            data_list = [dict(row) for row in result]
-            # 🔥 加日志：看数据库到底有没有数据
+            # 🔥🔥🔥 唯一修复：必须加 mappings()！SQLAlchemy 2.0 强制要求
+            data_list = [dict(row) for row in result.mappings()]
             print(f"[DB] 查询到 {len(data_list)} 条数据：{data_list}")
             return data_list
 
