@@ -19,7 +19,7 @@ from openai import OpenAI
 
 # 工具导入
 from server.encoding_utils import safe_input, safe_print
-from scripts.csv_incremental_update import TABLE_RULES
+from config.table_schemas import TABLE_RULES
 
 # 加载配置
 load_dotenv(os.path.join(MAIN_PROJECT_ROOT, ".env"))
