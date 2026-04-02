@@ -35,7 +35,7 @@ def get_mysql_engine():
 def get_dashboard_stats():
     engine = get_mysql_engine()
     if not engine:
-        return {'info_count': 6455, 'song_count': 5483, 'artist_count': 3108}
+        return {'info_count': 191, 'song_count': 98, 'artist_count': 10}
 
     try:
         with engine.connect() as conn:
@@ -55,7 +55,7 @@ def get_dashboard_stats():
             }
     except Exception as e:
         print(f"[DB Error] {e}")
-        return {'info_count': 11, 'song_count': 45, 'artist_count': 14}
+        return {'info_count': 191, 'song_count': 98, 'artist_count': 10}
 
 # ===================== 🔥 往年今日【终极极简版】单表查询 + Python拼接 =====================
 # 核心：无JOIN、无复杂函数、无别名，和你原有代码100%一致，绝对不报错
