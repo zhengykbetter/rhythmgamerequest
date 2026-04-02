@@ -56,31 +56,35 @@ def get_dashboard_stats():
         print(f"[DB Error] {e}")
         return {'info_count': 11, 'song_count': 45, 'artist_count': 14}
 # ===================== 往年今日 - 核心数据库查询（修复版·英文字段） =====================
+# ===================== 往年今日 - 核心数据库查询（最终修复版） =====================
 def get_year_today_songs():
     engine = get_mysql_engine()
     if not engine:
+        print("[DB] 数据库连接失败")
         return []
 
     try:
         with engine.connect() as conn:
-            # 🔥 唯一修改：全部用英文字段名，彻底解决undefined问题
+            # 🔥 关键修复：所有中文字段加反引号 `字段名`
             sql = text("""
                 SELECT
-                  YEAR(g.收录时间) AS year,
-                  g.游戏编号 AS game,
-                  CASE WHEN g.本家 = g.游戏编号 THEN 1 ELSE 0 END AS is_original,
-                  s.作者 AS author,
-                  s.歌名 AS song
+                  YEAR(g.`收录时间`) AS year,
+                  g.`游戏编号` AS game,
+                  CASE WHEN g.`本家` = g.`游戏编号` THEN 1 ELSE 0 END AS is_original,
+                  s.`作者` AS author,
+                  s.`歌名` AS song
                 FROM game_song_rel g
                 JOIN song_info s ON g.song_id = s.song_id
-                WHERE MONTH(g.收录时间) = MONTH(CURDATE())
-                  AND DAY(g.收录时间) = DAY(CURDATE())
-                ORDER BY is_original DESC, g.收录时间 DESC
+                WHERE MONTH(g.`收录时间`) = MONTH(CURDATE())
+                  AND DAY(g.`收录时间`) = DAY(CURDATE())
+                ORDER BY is_original DESC, g.`收录时间` DESC
             """)
             result = conn.execute(sql)
             data_list = [dict(row) for row in result]
+            # 🔥 加日志：看数据库到底有没有数据
+            print(f"[DB] 查询到 {len(data_list)} 条数据：{data_list}")
             return data_list
 
     except Exception as e:
-        print(f"[往年今日 DB错误] {e}")
+        print(f"[DB错误] {e}")
         return []
