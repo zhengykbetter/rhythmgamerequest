@@ -10,7 +10,7 @@ class Config:
     # ========== 2. 【核心改动】外部数据仓库配置 ==========
     # 默认外部仓库路径 (项目根目录同级的 external_data 文件夹，可通过环境变量 EXTERNAL_DATA_ROOT 覆盖)
     # 这里使用 .parents[1] 跳出 frontend，再跳出 main_project，到达项目根目录的上级
-    DEFAULT_EXTERNAL_ROOT = BASE_DIR.parents[1] / "external_data"
+    DEFAULT_EXTERNAL_ROOT = BASE_DIR.parents[1] / "external_data_repo"
     EXTERNAL_DATA_ROOT = Path(os.getenv("EXTERNAL_DATA_ROOT", str(DEFAULT_EXTERNAL_ROOT)))
 
     # ========== 3. 目录结构定义 (全部迁移到外部仓库) ==========
