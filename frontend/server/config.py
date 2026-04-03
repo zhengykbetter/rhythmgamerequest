@@ -7,13 +7,19 @@ class Config:
     BASE_DIR = Path(__file__).parent.parent  # frontend/
     FRONTEND_ROOT = BASE_DIR
     
-    # ========== 2. 目录结构定义 ==========
-    BLOGSHOW_DIR = BASE_DIR / "blogshow"
-    DATA_ISSUES_DIR = BASE_DIR / "data_issues"
-    DATA_DIR = BASE_DIR / "data"
+    # ========== 2. 【核心改动】外部数据仓库配置 ==========
+    # 默认外部仓库路径 (项目根目录同级的 external_data 文件夹，可通过环境变量 EXTERNAL_DATA_ROOT 覆盖)
+    # 这里使用 .parents[1] 跳出 frontend，再跳出 main_project，到达项目根目录的上级
+    DEFAULT_EXTERNAL_ROOT = BASE_DIR.parents[1] / "external_data"
+    EXTERNAL_DATA_ROOT = Path(os.getenv("EXTERNAL_DATA_ROOT", str(DEFAULT_EXTERNAL_ROOT)))
+
+    # ========== 3. 目录结构定义 (全部迁移到外部仓库) ==========
+    BLOGSHOW_DIR = EXTERNAL_DATA_ROOT / "blogshow"
+    DATA_ISSUES_DIR = EXTERNAL_DATA_ROOT / "data_issues"
+    DATA_DIR = EXTERNAL_DATA_ROOT / "data"
     HISTORY_TODAY_CACHE_DIR = DATA_DIR / "history_today"
 
-    # ========== 3. 文件路径定义 ==========
+    # ========== 4. 文件路径定义 (无需改动，自动跟随目录变更) ==========
     LOG_PATH = BLOGSHOW_DIR / "update.log"
     COUNT_PATH = BLOGSHOW_DIR / "visit_count.txt"
     ISSUES_PATH = DATA_ISSUES_DIR / "issues.json"
@@ -25,7 +31,7 @@ class Config:
     CONTRIBUTORS_PATH = DATA_DIR / "contributors.json"
     BENCHMARK_ISSUES_PATH = DATA_DIR / "benchmark_issues.json"
 
-    # ========== 4. 集中初始化 (目录+文件) ==========
+    # ========== 5. 集中初始化 (无需改动，自动在外部路径创建目录) ==========
     @classmethod
     def initialize(cls):
         dirs_to_create = [
@@ -54,7 +60,7 @@ class Config:
                     with open(file_path, "w", encoding="utf-8") as f:
                         f.write(default_content)
 
-    # ========== 5. 博客内容加载 ==========
+    # ========== 6. 博客内容加载 ==========
     @classmethod
     def _load_blog(cls):
         if cls.LOG_PATH.exists():
@@ -67,6 +73,4 @@ class Config:
 
 # 执行初始化
 Config.initialize()
-
-# 【修复】将 UPDATE_BLOG 挂载为 Config 类的静态属性，以兼容 routes/main.py 的调用方式
 Config.UPDATE_BLOG = Config._load_blog()
