@@ -18,11 +18,13 @@ class Config:
     DATA_ISSUES_DIR = EXTERNAL_DATA_ROOT / "data_issues"
     DATA_DIR = EXTERNAL_DATA_ROOT / "data"
     HISTORY_TODAY_CACHE_DIR = DATA_DIR / "history_today"
+    DATA_QUERIES_DIR = EXTERNAL_DATA_ROOT / "data_queries"
 
     # ========== 4. 文件路径定义 (无需改动，自动跟随目录变更) ==========
     LOG_PATH = BLOGSHOW_DIR / "update.log"
     COUNT_PATH = BLOGSHOW_DIR / "visit_count.txt"
     ISSUES_PATH = DATA_ISSUES_DIR / "issues.json"
+    USER_QUERIES_LOG_PATH = DATA_QUERIES_DIR / "user_queries.txt"
     
     @staticmethod
     def get_benchmark_csv_path(version="v1"):
@@ -38,7 +40,8 @@ class Config:
             cls.BLOGSHOW_DIR,
             cls.DATA_ISSUES_DIR,
             cls.DATA_DIR,
-            cls.HISTORY_TODAY_CACHE_DIR
+            cls.HISTORY_TODAY_CACHE_DIR,
+            cls.DATA_QUERIES_DIR
         ]
         for d in dirs_to_create:
             d.mkdir(parents=True, exist_ok=True)

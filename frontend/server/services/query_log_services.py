@@ -1,11 +1,16 @@
-from pathlib import Path
 from datetime import datetime
+import sys
+from pathlib import Path
 
-# 定义保存文件的路径
-LOG_FILE = Path(__file__).parent.parent.parent / "data_queries" / "user_queries.txt"
+# 1. 导入 Config
+CURRENT_FILE = Path(__file__).resolve()
+if str(CURRENT_FILE.parents[1]) not in sys.path:
+    sys.path.insert(0, str(CURRENT_FILE.parents[1]))
 
-# 确保目录存在
-LOG_FILE.parent.mkdir(exist_ok=True)
+from server.config import Config
+
+# 2. 使用 Config 中的路径，不再自己计算
+LOG_FILE = Config.USER_QUERIES_LOG_PATH
 
 def log_query_simple(query_text):
     """
@@ -13,11 +18,7 @@ def log_query_simple(query_text):
     """
     if not query_text or query_text == 'ERROR_PARSING':
         return
-        
-    # 可以在前面加个时间，也可以不加
-    # line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {query_text}\n"
     
-    # 纯文本，一行一个
     line = f"{query_text}\n"
     
     with open(LOG_FILE, "a", encoding="utf-8") as f:
