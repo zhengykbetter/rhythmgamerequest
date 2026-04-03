@@ -1,95 +1,75 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-✅ Benchmark 第一阶段服务（修复版）
-功能：读取CSV题库、读写JSON贡献者/Issue、计算统计数据
+✅ Benchmark 第一阶段服务（配置中心化版）
 """
-import os
 import csv
 import json
 from datetime import datetime
+from pathlib import Path
 
-# 精准路径计算（100%匹配你的目录结构）
-CURRENT_FILE = os.path.abspath(__file__)
-# 三级父目录：services → server → frontend
-FRONTEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_FILE)))
-DATA_DIR = os.path.join(FRONTEND_ROOT, "data")
+# 1. 统一导入 Config
+import sys
+from pathlib import Path
+CURRENT_FILE = Path(__file__).resolve()
+# 只需要这一个锚点来导入 config，具体路径全由 Config 管
+if str(CURRENT_FILE.parents[1]) not in sys.path:
+    sys.path.insert(0, str(CURRENT_FILE.parents[1]))
 
-# 打印路径，方便调试
-print(f"【调试】Frontend根目录：{FRONTEND_ROOT}")
-print(f"【调试】数据目录：{DATA_DIR}")
+from server.config import Config
 
-# ===================== CSV 题库读取（修复版） =====================
+# ===================== CSV 题库读取（使用 Config） =====================
 def load_questions(version="v1"):
-    """
-    读取指定版本的CSV题库
-    返回：[{id: int, question: str}, ...]
-    """
-    csv_filename = f"benchmark_{version}.csv"
-    csv_path = os.path.join(DATA_DIR, csv_filename)
+    csv_path = Config.get_benchmark_csv_path(version)
     
-    # 1. 检查文件是否存在
-    if not os.path.exists(csv_path):
+    if not csv_path.exists():
         print(f"【错误】CSV文件不存在：{csv_path}")
         return []
     
-    # 2. 检查文件权限
     if not os.access(csv_path, os.R_OK):
         print(f"【错误】CSV文件无读权限：{csv_path}")
         return []
 
     questions = []
-    # 3. 用utf-8-sig兼容BOM，逗号分隔匹配你的CSV格式
     try:
         with open(csv_path, "r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f, delimiter=",") # 严格匹配你的逗号分隔
-            # 校验表头
+            reader = csv.DictReader(f, delimiter=",")
             if not {"序号", "问题"}.issubset(reader.fieldnames):
                 print(f"【错误】CSV表头不匹配！当前表头：{reader.fieldnames}")
-                print(f"【要求】表头必须包含：序号,问题")
                 return []
             
-            # 逐行读取
-            for row_num, row in enumerate(reader, start=2): # 行号从2开始（表头是1）
+            for row_num, row in enumerate(reader, start=2):
                 try:
-                    question_id = int(row["序号"].strip())
-                    question_text = row["问题"].strip()
-                    if not question_text:
-                        print(f"【警告】第{row_num}行问题为空，跳过")
-                        continue
-                    questions.append({
-                        "id": question_id,
-                        "question": question_text
-                    })
+                    q_id = int(row["序号"].strip())
+                    q_text = row["问题"].strip()
+                    if q_text:
+                        questions.append({"id": q_id, "question": q_text})
                 except ValueError as e:
-                    print(f"【警告】第{row_num}行序号格式错误，跳过：{e}")
+                    print(f"【警告】第{row_num}行跳过：{e}")
                     continue
     except Exception as e:
-        print(f"【错误】CSV文件读取失败：{str(e)}")
+        print(f"【错误】CSV读取失败：{str(e)}")
         return []
 
-    print(f"【调试】成功加载{len(questions)}道题目")
     return sorted(questions, key=lambda x: x["id"])
 
-# ===================== JSON 贡献者读写（无改动） =====================
+# ===================== JSON 贡献者读写（使用 Config） =====================
 def load_contributors():
-    json_path = os.path.join(DATA_DIR, "contributors.json")
-    if not os.path.exists(json_path):
+    if not Config.CONTRIBUTORS_PATH.exists():
         return []
     try:
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(Config.CONTRIBUTORS_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"【错误】贡献者文件读取失败：{str(e)}")
+        print(f"【错误】贡献者读取失败：{str(e)}")
         return []
 
 def save_contributors(contributors):
-    json_path = os.path.join(DATA_DIR, "contributors.json")
     try:
-        with open(json_path, "w", encoding="utf-8") as f:
+        with open(Config.CONTRIBUTORS_PATH, "w", encoding="utf-8") as f:
             json.dump(contributors, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"【错误】贡献者文件写入失败：{str(e)}")
+        print(f"【错误】贡献者写入失败：{str(e)}")
 
 def add_contributor(name, total_score, question_scores, version="v1"):
     contributors = load_contributors()
@@ -107,38 +87,31 @@ def add_contributor(name, total_score, question_scores, version="v1"):
 
 # ===================== 统计数据计算（无改动） =====================
 def get_statistics():
-    """
-    计算已测试人次、当前均分
-    返回：{total_tests: int, avg_score: float or None}
-    """
     contributors = load_contributors()
     total_tests = len(contributors)
     if total_tests == 0:
         return {"total_tests": 0, "avg_score": None}
-    
     total_score_sum = sum([c["total_score"] for c in contributors])
     avg_score = round(total_score_sum / total_tests, 1)
     return {"total_tests": total_tests, "avg_score": avg_score}
 
-# ===================== Benchmark Issue 读写（新增） =====================
+# ===================== Benchmark Issue 读写（使用 Config） =====================
 def load_benchmark_issues():
-    json_path = os.path.join(DATA_DIR, "benchmark_issues.json")
-    if not os.path.exists(json_path):
+    if not Config.BENCHMARK_ISSUES_PATH.exists():
         return []
     try:
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(Config.BENCHMARK_ISSUES_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"【错误】Benchmark Issue文件读取失败：{str(e)}")
+        print(f"【错误】Benchmark Issue读取失败：{str(e)}")
         return []
 
 def save_benchmark_issues(issues):
-    json_path = os.path.join(DATA_DIR, "benchmark_issues.json")
     try:
-        with open(json_path, "w", encoding="utf-8") as f:
+        with open(Config.BENCHMARK_ISSUES_PATH, "w", encoding="utf-8") as f:
             json.dump(issues, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"【错误】Benchmark Issue文件写入失败：{str(e)}")
+        print(f"【错误】Benchmark Issue写入失败：{str(e)}")
 
 def add_benchmark_issue(name, contact, content, question_id=None, version="v1"):
     issues = load_benchmark_issues()

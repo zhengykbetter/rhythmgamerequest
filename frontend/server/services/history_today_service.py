@@ -1,38 +1,33 @@
 import sys
-import os
 import json
 from datetime import datetime
 from pathlib import Path
 
-# 路径修复
+# 1. 导入 Config (移除对 config.settings.CSV_TARGET_DIR 的依赖，改用 Config)
 CURRENT_FILE = Path(__file__).resolve()
-PROJECT_ROOT = CURRENT_FILE.parents[3]
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "frontend"))
+if str(CURRENT_FILE.parents[1]) not in sys.path:
+    sys.path.insert(0, str(CURRENT_FILE.parents[1]))
 
+from server.config import Config
 from server.services.db_service import get_year_today_songs
-from config.settings import CSV_TARGET_DIR
-
-# 缓存配置
-CACHE_DIR = os.path.join(CSV_TARGET_DIR, "history_today")
-os.makedirs(CACHE_DIR, exist_ok=True)
 
 def get_history_today_data():
-    # 文件名：0402（匹配你的文件格式）
+    # 2. 使用 Config 中的缓存目录
+    cache_dir = Config.HISTORY_TODAY_CACHE_DIR
+    
     date_key = datetime.now().strftime("%m%d")
-    cache_file = os.path.join(CACHE_DIR, f"{date_key}.json")
+    cache_file = cache_dir / f"{date_key}.json"
 
     # 读取缓存
-    if os.path.exists(cache_file):
+    if cache_file.exists():
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             print(f"[缓存错误] {e}")
 
-    # 软编码：查询数据库
+    # 查询数据库
     raw_data = get_year_today_songs()
-    print(f"[服务] 数据库返回原始数据：{raw_data}")
 
     # 拼接文案
     result = []
@@ -59,6 +54,6 @@ def get_history_today_data():
 
 # 手动测试
 if __name__ == '__main__':
-    print("🔥 软编码测试：查询数据库生成往年今日")
+    print("🔥 配置中心化测试：查询数据库生成往年今日")
     data = get_history_today_data()
     print("✅ 最终数据：", data)
