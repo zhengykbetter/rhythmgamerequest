@@ -4,39 +4,51 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-# 【修复】保留你原有的路径逻辑，确保能找到 db_service 和 settings
+# 路径修复（完全保留原有可用逻辑）
 CURRENT_FILE = Path(__file__).resolve()
 PROJECT_ROOT = CURRENT_FILE.parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "frontend"))
 
 from server.services.db_service import get_year_today_songs
-# 【新增】同时导入 Config 来管理路径
-if str(CURRENT_FILE.parents[1]) not in sys.path:
-    sys.path.insert(0, str(CURRENT_FILE.parents[1]))
-from server.config import Config
+from config.settings import CSV_TARGET_DIR
+
+# 缓存配置
+CACHE_DIR = os.path.join(CSV_TARGET_DIR, "history_today")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 def get_history_today_data():
-    # 【修复】使用 Config 的缓存目录，但逻辑完全不变
-    cache_dir = Config.HISTORY_TODAY_CACHE_DIR
-    # 双重保险，防止目录未创建
-    os.makedirs(cache_dir, exist_ok=True)
-    
     date_key = datetime.now().strftime("%m%d")
-    cache_file = os.path.join(cache_dir, f"{date_key}.json")
+    cache_file = os.path.join(CACHE_DIR, f"{date_key}.json")
 
-    # 读取缓存 (完全保留你原有的逻辑)
+    # ===================== 【改动开始】 =====================
+    # 1. 先标记：是否需要重新生成（默认False）
+    need_refresh = False
+    
+    # 2. 缓存存在 → 读取并判断是否为无效缓存
     if os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                cache_data = json.load(f)
+            
+            # ✅ 关键：如果缓存是【暂无历史数据】，强制刷新
+            if cache_data == ["暂无历史数据"]:
+                need_refresh = True
+            else:
+                # 有效缓存，直接返回
+                return cache_data
         except Exception as e:
             print(f"[缓存错误] {e}")
+            need_refresh = True
 
-    # 【关键】这里还是调用你原来的 db_service 函数
+    # 3. 无缓存 / 无效缓存 → 重新查询数据库
+    # ===================== 【改动结束】 =====================
+
+    # 数据库查询（原有逻辑不变）
     raw_data = get_year_today_songs()
+    print(f"[服务] 数据库返回原始数据：{raw_data}")
 
-    # 拼接文案 (完全保留你原有的逻辑)
+    # 拼接文案
     result = []
     if raw_data:
         for item in raw_data:
@@ -53,13 +65,14 @@ def get_history_today_data():
     else:
         result = ["暂无历史数据"]
 
-    # 写入缓存
+    # 写入新缓存（覆盖旧无效缓存）
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     
     return result
 
+# 手动测试
 if __name__ == '__main__':
-    print("🔥 测试往年今日")
+    print("🔥 测试往年今日（强制刷新无效缓存）")
     data = get_history_today_data()
-    print("✅ 结果：", data)
+    print("✅ 最终数据：", data)

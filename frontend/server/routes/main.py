@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request
 from server.services.visit_service import get_visit_count, get_luck
-from server.services.db_service import get_dashboard_stats  # <-- 新增
+from server.services.db_service import get_dashboard_stats
 from server.config import Config
-from config.version import APP_VERSION
+# 【改动】从主配置文件导入版本，删除旧的 from config.version import APP_VERSION
+from config.settings import APP_VERSION
 
 main_bp = Blueprint('main', __name__)
 

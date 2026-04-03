@@ -7,6 +7,9 @@
 import os
 from pathlib import Path
 
+# ===================== 应用版本配置（新增） =====================
+APP_VERSION = "v0.1.3 beta"
+
 # ===================== 基础路径配置 =====================
 MAIN_REPO_ROOT = Path(__file__).parent.parent  # config目录的上一级（主仓库根）
 PRIVATE_CSV_REPO_ROOT = Path("/opt/csv_repo")
