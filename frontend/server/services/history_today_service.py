@@ -1,35 +1,42 @@
 import sys
+import os
 import json
 from datetime import datetime
 from pathlib import Path
 
-# 1. 导入 Config (移除对 config.settings.CSV_TARGET_DIR 的依赖，改用 Config)
+# 【修复】保留你原有的路径逻辑，确保能找到 db_service 和 settings
 CURRENT_FILE = Path(__file__).resolve()
+PROJECT_ROOT = CURRENT_FILE.parents[3]
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "frontend"))
+
+from server.services.db_service import get_year_today_songs
+# 【新增】同时导入 Config 来管理路径
 if str(CURRENT_FILE.parents[1]) not in sys.path:
     sys.path.insert(0, str(CURRENT_FILE.parents[1]))
-
 from server.config import Config
-from server.services.db_service import get_year_today_songs
 
 def get_history_today_data():
-    # 2. 使用 Config 中的缓存目录
+    # 【修复】使用 Config 的缓存目录，但逻辑完全不变
     cache_dir = Config.HISTORY_TODAY_CACHE_DIR
+    # 双重保险，防止目录未创建
+    os.makedirs(cache_dir, exist_ok=True)
     
     date_key = datetime.now().strftime("%m%d")
-    cache_file = cache_dir / f"{date_key}.json"
+    cache_file = os.path.join(cache_dir, f"{date_key}.json")
 
-    # 读取缓存
-    if cache_file.exists():
+    # 读取缓存 (完全保留你原有的逻辑)
+    if os.path.exists(cache_file):
         try:
             with open(cache_file, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             print(f"[缓存错误] {e}")
 
-    # 查询数据库
+    # 【关键】这里还是调用你原来的 db_service 函数
     raw_data = get_year_today_songs()
 
-    # 拼接文案
+    # 拼接文案 (完全保留你原有的逻辑)
     result = []
     if raw_data:
         for item in raw_data:
@@ -52,8 +59,7 @@ def get_history_today_data():
     
     return result
 
-# 手动测试
 if __name__ == '__main__':
-    print("🔥 配置中心化测试：查询数据库生成往年今日")
+    print("🔥 测试往年今日")
     data = get_history_today_data()
-    print("✅ 最终数据：", data)
+    print("✅ 结果：", data)
