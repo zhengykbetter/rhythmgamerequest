@@ -1,22 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-✅ Benchmark 第一阶段服务（配置中心化版）
-"""
 import csv
 import json
+import os  # 【修复】重新添加 os 导入
 from datetime import datetime
 from pathlib import Path
 
-# 1. 统一导入 Config
+# 导入 Config
 import sys
-from pathlib import Path
 CURRENT_FILE = Path(__file__).resolve()
-# 只需要这一个锚点来导入 config，具体路径全由 Config 管
 if str(CURRENT_FILE.parents[1]) not in sys.path:
     sys.path.insert(0, str(CURRENT_FILE.parents[1]))
 
 from server.config import Config
+
 
 # ===================== CSV 题库读取（使用 Config） =====================
 def load_questions(version="v1"):
