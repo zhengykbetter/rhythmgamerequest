@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CSV一键同步MySQL（极简一步版）
+CSV一键同步MySQL（增强调试版）
 ✅ 一步执行：删除所有表 → 重建表结构 → 全量导入CSV数据
-✅ 适配新 game_song_rel 表结构（游戏编号INT+新增游戏名字段）
-✅ 无参数、无交互、无冗余逻辑
-✅ 🔥 修复：彻底处理 NaT 日期空值问题
+✅ 适配新 game_song_rel 表结构
+✅ 🔥 增强：详细的空值统计、日期解析调试信息
+✅ 🔥 帮助定位：为什么会有这么多空时间数据
 """
 import os
 import sys
@@ -77,28 +77,74 @@ def read_csv_safe(csv_path):
     except:
         return pd.read_csv(csv_path, encoding="utf-8")
 
-# ===================== 【核心修复】数据清洗函数 =====================
-def preprocess_df(df, table_name):
-    """数据清洗（修复版：彻底处理 NaT 日期空值）"""
+# ===================== 【增强调试】数据清洗与统计函数 =====================
+def preprocess_df_with_debug(df, table_name, csv_path):
+    """
+    数据清洗 + 详细调试统计
+    输出：清洗后的DataFrame + 详细统计信息
+    """
     rules = TABLE_RULES[table_name]
     pk = rules["primary_key"]
     date_cols = rules["date_cols"]
-
+    
+    print(f"\n📊 【{table_name}】数据质量统计：")
+    print(f"   总行数：{len(df):,}")
+    
+    # 1. 原始数据空值统计
+    print(f"\n   🔍 原始CSV空值统计：")
+    for col in df.columns:
+        null_count = df[col].isna().sum()
+        if null_count > 0:
+            print(f"      - {col}: {null_count:,} 条空值 ({null_count/len(df)*100:.1f}%)")
+    
+    # 2. 日期列详细解析统计
+    if date_cols:
+        print(f"\n   📅 日期列解析统计：")
+        for col in date_cols:
+            if col not in df.columns:
+                continue
+            
+            # 统计原始空值
+            original_null = df[col].isna().sum()
+            
+            # 尝试解析
+            parsed_series = pd.to_datetime(df[col], errors="coerce")
+            parse_fail = parsed_series.isna().sum() - original_null
+            
+            print(f"      - {col}:")
+            print(f"         原始空值：{original_null:,} 条")
+            if parse_fail > 0:
+                print(f"         ⚠️  解析失败：{parse_fail:,} 条（格式错误）")
+                
+                # 打印前5条解析失败的样本
+                fail_samples = df[parsed_series.isna() & df[col].notna()][col].head(5)
+                if len(fail_samples) > 0:
+                    print(f"         解析失败样本：{list(fail_samples.values)}")
+    
+    # 3. 正式清洗
+    print(f"\n   🔧 开始数据清洗...")
+    
     # 主键清洗
     if pk in df.columns:
         df[pk] = df[pk].fillna("").astype(str).str.strip()
     
-    # 日期列清洗（核心修复）
+    # 日期列清洗
     for col in date_cols:
         if col in df.columns:
-            # 1. 先统一转为 datetime，错误/空值转为 NaT
             df[col] = pd.to_datetime(df[col], errors="coerce")
-            # 2. 显式将 NaT 替换为 None，有效日期转为 date 对象
-            # 这一步确保 MySQL 收到的是 NULL 而不是 NaT
             df[col] = df[col].apply(lambda x: x.date() if pd.notna(x) else None)
     
     # 其余列空值处理
-    return df.where(pd.notna(df), None)
+    df = df.where(pd.notna(df), None)
+    
+    # 4. 清洗后最终统计
+    final_null_count = sum(df[col].isna().sum() for col in date_cols if col in df.columns)
+    if final_null_count > 0:
+        print(f"   ⚠️  清洗后仍有 {final_null_count:,} 条日期空值将存入 NULL")
+    else:
+        print(f"   ✅ 清洗完成，无日期空值")
+    
+    return df
 
 # ===================== 一步式核心流程 =====================
 def one_click_sync():
@@ -106,12 +152,14 @@ def one_click_sync():
     create_order = TABLE_RULES["create_order"]
     drop_order = ["game_song_rel", "song_author_rel", "game_linkage_rel", "song_info", "author_info", "game_info"]
 
-    print("=" * 60)
-    print("🔥 一步式数据库同步开始：删表 → 建表 → 导入数据")
-    print("=" * 60)
+    print("=" * 80)
+    print("🔥 一步式数据库同步开始（增强调试版）")
+    print("=" * 80)
 
-    # 1. 删除所有表（避免结构冲突）
-    print("\n1/3 🗑️ 删除旧表...")
+    # 1. 删除所有表
+    print("\n" + "=" * 80)
+    print("1/3 🗑️ 删除旧表...")
+    print("=" * 80)
     with engine.connect() as conn:
         for table in drop_order:
             try:
@@ -122,7 +170,9 @@ def one_click_sync():
         conn.commit()
 
     # 2. 重建所有表
-    print("\n2/3 📊 重建表结构...")
+    print("\n" + "=" * 80)
+    print("2/3 📊 重建表结构...")
+    print("=" * 80)
     with engine.connect() as conn:
         for table in create_order:
             try:
@@ -132,20 +182,28 @@ def one_click_sync():
                 print(f"⚠️ 创建表 {table} 失败: {str(e)}")
         conn.commit()
 
-    # 3. 全量导入CSV数据
-    print("\n3/3 📥 全量导入数据...")
+    # 3. 全量导入CSV数据（带调试）
+    print("\n" + "=" * 80)
+    print("3/3 📥 全量导入数据（增强调试）")
+    print("=" * 80)
     for table_name in create_order:
         if table_name not in CSV_PATHS:
             continue
         
         csv_path = CSV_PATHS[table_name]
         if not os.path.exists(csv_path):
-            print(f"⚠️ {table_name} CSV不存在，跳过")
+            print(f"\n⚠️ {table_name} CSV不存在，跳过")
             continue
 
-        # 读取+清洗数据
+        print(f"\n{'='*80}")
+        print(f"📌 处理表：{table_name}")
+        print(f"📂 CSV文件：{csv_path}")
+        print(f"{'='*80}")
+
+        # 读取+清洗数据（带调试）
         df = read_csv_safe(csv_path)
-        df = preprocess_df(df, table_name)
+        df = preprocess_df_with_debug(df, table_name, csv_path)
+        
         if df.empty:
             print(f"ℹ️ {table_name} 无数据，跳过")
             continue
@@ -159,18 +217,18 @@ def one_click_sync():
         with engine.begin() as conn:
             for _, row in df.iterrows():
                 row_dict = row.to_dict()
-                # 额外安全检查：确保没有 NaT 漏网
+                # 额外安全检查
                 for k, v in row_dict.items():
                     if pd.isna(v):
                         row_dict[k] = None
                 conn.execute(sql, row_dict)
         
-        print(f"✅ 导入 {table_name}: {len(df)} 条")
+        print(f"\n✅ 成功导入 {table_name}: {len(df):,} 条")
 
-    print("\n" + "=" * 60)
-    print("🎉 一步同步完成！所有表已更新为最新结构+数据")
-    print("=" * 60)
+    print("\n" + "=" * 80)
+    print("🎉 一步同步完成！")
+    print("=" * 80)
 
-# ===================== 主入口（直接运行） =====================
+# ===================== 主入口 =====================
 if __name__ == "__main__":
     one_click_sync()
