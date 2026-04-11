@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-歌曲数据提取脚本 V5.0（架构优化版）
+歌曲数据提取脚本 V5.1（修复版）
 ✅ 核心原则：
 1. 歌曲/作者去重 100% 依赖 extract_core_data.py
 2. 本脚本仅负责：读取 core 输出 + 生成关联表
 3. 彻底杜绝数据不一致
 4. 集成 unitoken.csv 用于作者关联
 5. 统一使用 utf-8-sig 编码
+✅ 修复内容：
+1. 游戏编号从名称修正为数字ID（解决关联错位）
+2. 新增冗余【游戏名】字段便于查看
+3. 增加游戏-歌曲关联去重
 """
 import os
 import sys
@@ -38,6 +42,8 @@ from config.settings import (
 # 输入文件
 RAW_SONG_CSV_PATH = os.path.join(CSV_TARGET_DIR, RAW_SONG_CSV_FILENAME)
 UNITOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "unitoken.csv")
+# 新增：游戏信息表路径（核心修复）
+GAME_INFO_CSV_PATH = os.path.join(CSV_TARGET_DIR, "game_info.csv")
 
 # Core 脚本输出文件（权威数据源）
 CORE_INPUT_PATHS = {
@@ -136,17 +142,24 @@ def extract_song_data_v5():
     logger.info(f"✅ 读取作者表：{len(df_author):,} 条")
     logger.info(f"✅ 读取中间映射：{len(df_key_map):,} 条")
 
-    # 2. 读取原始数据和 unitoken
+    # 2. 读取原始数据和 unitoken + 游戏信息表（核心修复）
     logger.info("\n" + "="*60)
-    logger.info("步骤2：读取原始数据与 unitoken")
+    logger.info("步骤2：读取原始数据、unitoken、游戏信息表")
     logger.info("="*60)
     
     if not os.path.exists(RAW_SONG_CSV_PATH):
         logger.error(f"❌ 原始文件不存在：{RAW_SONG_CSV_PATH}")
         return False
+    if not os.path.exists(GAME_INFO_CSV_PATH):
+        logger.error(f"❌ 游戏信息表不存在：{GAME_INFO_CSV_PATH}")
+        return False
 
     df_raw = pd.read_csv(RAW_SONG_CSV_PATH, encoding="utf-8-sig", dtype=str, na_filter=True)
     unitoken_map = build_unitoken_map(UNITOKEN_CSV_PATH)
+    # 核心修复：构建 游戏名 → 游戏编号 映射
+    df_game = pd.read_csv(GAME_INFO_CSV_PATH, encoding="utf-8-sig")
+    game_name_to_id = dict(zip(df_game["游戏"], df_game["游戏编号"].astype(int)))
+    logger.info(f"✅ 成功读取 game_info.csv：共 {len(game_name_to_id)} 个游戏映射")
 
     # 清洗原始数据
     for col in ["song_id", "歌名", "作者", "真实作者"]:
@@ -177,10 +190,11 @@ def extract_song_data_v5():
     song_author_rel = []
     rel_id_counter = 1000001
     sa_pairs = set()
+    gs_pairs = set()  # 新增：游戏-歌曲关联去重集合
 
     for _, row in df_raw.iterrows():
         raw_sid = row["song_id"]
-        game = row["来源"]
+        game_name = row["来源"]  # 修改变名，语义清晰
         date = row["更新时间"]
         song_name = row["歌名"]
         real_authors = parse_real_authors(row["真实作者"]) or [row["作者"]]
@@ -190,18 +204,25 @@ def extract_song_data_v5():
         if not internal_sid:
             continue
 
-        # ============== 游戏-歌曲关联（100% 保留原始收录记录） ==============
-        if game:
+        # ============== 游戏-歌曲关联（修复+冗余字段+去重） ==============
+        if game_name and game_name in game_name_to_id:
+            game_id = game_name_to_id[game_name]
+            # 去重：同一首歌+同一游戏只保留一条
+            if (internal_sid, game_id) in gs_pairs:
+                continue
+            gs_pairs.add((internal_sid, game_id))
+            
             game_song_rel.append({
                 "rel_id": raw_sid,
-                "游戏编号": game,
+                "游戏编号": game_id,       # 修复：数字ID，用于关联
+                "游戏名": game_name,       # 新增：冗余字段，直观显示
                 "song_id": internal_sid,
                 "本家": internal_sid_to_home.get(internal_sid, ""),
                 "收录时间": get_standard_date(date),
                 "最新更新时间": current_time
             })
 
-        # ============== 歌曲-作者关联（通过作者名匹配 Core 的 author_id） ==============
+        # ============== 歌曲-作者关联（无修改） ==============
         for a_name in real_authors:
             if a_name not in author_name_to_id:
                 continue
@@ -224,15 +245,15 @@ def extract_song_data_v5():
     logger.info("步骤5：导出关联表")
     logger.info("="*60)
     
-    # 游戏-歌曲关联表
+    # 游戏-歌曲关联表（新增游戏名列）
     df_gs_rel = pd.DataFrame(game_song_rel)
-    df_gs_rel = df_gs_rel[["rel_id", "游戏编号", "song_id", "本家", "收录时间", "最新更新时间"]]
+    df_gs_rel = df_gs_rel[["rel_id", "游戏编号", "游戏名", "song_id", "本家", "收录时间", "最新更新时间"]]
     df_gs_rel.to_csv(OUTPUT_PATHS["game_song_rel"], encoding="utf-8-sig", index=False)
 
-    # 歌曲-作者关联表
+    # 歌曲-作者关联表（无修改）
     pd.DataFrame(song_author_rel).to_csv(OUTPUT_PATHS["song_author_rel"], encoding="utf-8-sig", index=False)
 
-    # 游戏联动关联表（空表）
+    # 游戏联动关联表（无修改）
     pd.DataFrame(columns=["rel_id","游戏1编号","游戏2编号","联动名称","最新更新时间"]).to_csv(OUTPUT_PATHS["game_linkage_rel"], encoding="utf-8-sig", index=False)
 
     # 6. 最终统计

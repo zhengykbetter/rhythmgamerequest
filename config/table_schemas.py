@@ -54,13 +54,15 @@ TABLE_RULES = {
         },
         "foreign_keys": []
     },
+    # ===================== 【仅修改此处】game_song_rel 表结构 =====================
     "game_song_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
         "date_cols": ["收录时间"],
         "field_types": {
             "rel_id": "VARCHAR(200)",
-            "游戏编号": "VARCHAR(100)",
+            "游戏编号": "INT",  # 🔧 核心修改：从 VARCHAR(100) 改为 INT（数字游戏ID）
+            "游戏名": "VARCHAR(200)",  # 🔧 新增：冗余游戏名字段
             "song_id": "VARCHAR(50)",
             "本家": "VARCHAR(200)",
             "收录时间": "DATE",
@@ -69,6 +71,7 @@ TABLE_RULES = {
         },
         "foreign_keys": []
     },
+    # ============================================================================
     "song_author_rel": {
         "primary_key": "rel_id",
         "auto_cols": ["最新更新时间", "update_timestamp"],
