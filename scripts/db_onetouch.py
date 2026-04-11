@@ -5,6 +5,7 @@ CSV一键同步MySQL（极简一步版）
 ✅ 一步执行：删除所有表 → 重建表结构 → 全量导入CSV数据
 ✅ 适配新 game_song_rel 表结构（游戏编号INT+新增游戏名字段）
 ✅ 无参数、无交互、无冗余逻辑
+✅ 🔥 修复：彻底处理 NaT 日期空值问题
 """
 import os
 import sys
@@ -76,19 +77,27 @@ def read_csv_safe(csv_path):
     except:
         return pd.read_csv(csv_path, encoding="utf-8")
 
+# ===================== 【核心修复】数据清洗函数 =====================
 def preprocess_df(df, table_name):
-    """数据清洗"""
+    """数据清洗（修复版：彻底处理 NaT 日期空值）"""
     rules = TABLE_RULES[table_name]
     pk = rules["primary_key"]
     date_cols = rules["date_cols"]
 
+    # 主键清洗
     if pk in df.columns:
         df[pk] = df[pk].fillna("").astype(str).str.strip()
     
+    # 日期列清洗（核心修复）
     for col in date_cols:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce").dt.date
+            # 1. 先统一转为 datetime，错误/空值转为 NaT
+            df[col] = pd.to_datetime(df[col], errors="coerce")
+            # 2. 显式将 NaT 替换为 None，有效日期转为 date 对象
+            # 这一步确保 MySQL 收到的是 NULL 而不是 NaT
+            df[col] = df[col].apply(lambda x: x.date() if pd.notna(x) else None)
     
+    # 其余列空值处理
     return df.where(pd.notna(df), None)
 
 # ===================== 一步式核心流程 =====================
@@ -150,9 +159,10 @@ def one_click_sync():
         with engine.begin() as conn:
             for _, row in df.iterrows():
                 row_dict = row.to_dict()
+                # 额外安全检查：确保没有 NaT 漏网
                 for k, v in row_dict.items():
-                    if isinstance(v, pd.Timestamp):
-                        row_dict[k] = v.date()
+                    if pd.isna(v):
+                        row_dict[k] = None
                 conn.execute(sql, row_dict)
         
         print(f"✅ 导入 {table_name}: {len(df)} 条")
