@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-歌曲数据提取脚本 V5.1（修复版）
-✅ 核心原则：
-1. 歌曲/作者去重 100% 依赖 extract_core_data.py
-2. 本脚本仅负责：读取 core 输出 + 生成关联表
-3. 彻底杜绝数据不一致
-4. 集成 unitoken.csv 用于作者关联
-5. 统一使用 utf-8-sig 编码
-✅ 修复内容：
-1. 游戏编号从名称修正为数字ID（解决关联错位）
-2. 新增冗余【游戏名】字段便于查看
-3. 增加游戏-歌曲关联去重
+歌曲数据提取脚本 V5.3（调试无效游戏名版）
+✅ 核心：只加调试信息，看看具体是哪些游戏名被跳过了
 """
 import os
 import sys
@@ -19,6 +10,7 @@ import ast
 import pandas as pd
 import logging
 from datetime import datetime
+from collections import defaultdict, Counter
 
 # ===================== 日志系统 =====================
 logging.basicConfig(
@@ -42,7 +34,6 @@ from config.settings import (
 # 输入文件
 RAW_SONG_CSV_PATH = os.path.join(CSV_TARGET_DIR, RAW_SONG_CSV_FILENAME)
 UNITOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "unitoken.csv")
-# 新增：游戏信息表路径（核心修复）
 GAME_INFO_CSV_PATH = os.path.join(CSV_TARGET_DIR, "game_info.csv")
 
 # Core 脚本输出文件（权威数据源）
@@ -123,9 +114,9 @@ def get_unified_token(original_token, unitoken_map):
 # ===================== 核心业务逻辑（仅关联表生成） =====================
 def extract_song_data_v5():
     # 1. 检查并读取 Core 输出（权威数据源）
-    logger.info("="*60)
+    logger.info("="*80)
     logger.info("步骤1：读取 Core 脚本输出（权威数据源）")
-    logger.info("="*60)
+    logger.info("="*80)
     
     for path in CORE_INPUT_PATHS.values():
         if not os.path.exists(path):
@@ -143,9 +134,9 @@ def extract_song_data_v5():
     logger.info(f"✅ 读取中间映射：{len(df_key_map):,} 条")
 
     # 2. 读取原始数据和 unitoken + 游戏信息表（核心修复）
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "="*80)
     logger.info("步骤2：读取原始数据、unitoken、游戏信息表")
-    logger.info("="*60)
+    logger.info("="*80)
     
     if not os.path.exists(RAW_SONG_CSV_PATH):
         logger.error(f"❌ 原始文件不存在：{RAW_SONG_CSV_PATH}")
@@ -160,16 +151,18 @@ def extract_song_data_v5():
     df_game = pd.read_csv(GAME_INFO_CSV_PATH, encoding="utf-8-sig")
     game_name_to_id = dict(zip(df_game["游戏"], df_game["游戏编号"].astype(int)))
     logger.info(f"✅ 成功读取 game_info.csv：共 {len(game_name_to_id)} 个游戏映射")
+    logger.info(f"   已知游戏列表：{list(game_name_to_id.keys())}")
 
     # 清洗原始数据
     for col in ["song_id", "歌名", "作者", "真实作者"]:
         df_raw[col] = df_raw[col].apply(clean_string)
     df_raw = df_raw[df_raw["song_id"] != ""].reset_index(drop=True)
+    logger.info(f"✅ 原始数据清洗完成：共 {len(df_raw):,} 条有效记录")
 
     # 3. 构建映射字典
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "="*80)
     logger.info("步骤3：构建关联映射字典")
-    logger.info("="*60)
+    logger.info("="*80)
     
     # 原始song_id → 内部song_id（来自 Core）
     raw_sid_to_internal_sid = dict(zip(df_key_map["raw_song_id"], df_key_map["internal_song_id"]))
@@ -180,21 +173,34 @@ def extract_song_data_v5():
 
     logger.info(f"✅ 映射字典构建完成")
 
-    # 4. 生成关联表
-    logger.info("\n" + "="*60)
-    logger.info("步骤4：生成关联表")
-    logger.info("="*60)
+    # 4. 生成关联表（带详细无效游戏名调试）
+    logger.info("\n" + "="*80)
+    logger.info("步骤4：生成关联表（调试无效游戏名）")
+    logger.info("="*80)
     
     current_time = get_current_datetime()
     game_song_rel = []
     song_author_rel = []
     rel_id_counter = 1000001
     sa_pairs = set()
-    gs_pairs = set()  # 新增：游戏-歌曲关联去重集合
+    gs_pairs = set()
+    
+    # 🔥 调试用：记录无效游戏名
+    debug_gs_stats = {
+        "total_candidates": 0,
+        "skipped_no_internal_sid": 0,
+        "skipped_invalid_game": 0,
+        "duplicates_removed": 0,
+        "final_kept": 0
+    }
+    # 统计无效游戏名的出现次数
+    invalid_game_counter = Counter()
+    # 记录无效游戏名的样本
+    invalid_game_samples = defaultdict(list)
 
-    for _, row in df_raw.iterrows():
+    for idx, row in df_raw.iterrows():
         raw_sid = row["song_id"]
-        game_name = row["来源"]  # 修改变名，语义清晰
+        game_name = row["来源"]
         date = row["更新时间"]
         song_name = row["歌名"]
         real_authors = parse_real_authors(row["真实作者"]) or [row["作者"]]
@@ -202,25 +208,42 @@ def extract_song_data_v5():
         # 获取内部 song_id
         internal_sid = raw_sid_to_internal_sid.get(raw_sid)
         if not internal_sid:
+            debug_gs_stats["skipped_no_internal_sid"] += 1
             continue
 
-        # ============== 游戏-歌曲关联（修复+冗余字段+去重） ==============
-        if game_name and game_name in game_name_to_id:
-            game_id = game_name_to_id[game_name]
-            # 去重：同一首歌+同一游戏只保留一条
-            if (internal_sid, game_id) in gs_pairs:
-                continue
-            gs_pairs.add((internal_sid, game_id))
+        # ============== 游戏-歌曲关联（调试无效游戏名） ==============
+        if game_name:
+            debug_gs_stats["total_candidates"] += 1
             
-            game_song_rel.append({
-                "rel_id": raw_sid,
-                "游戏编号": game_id,       # 修复：数字ID，用于关联
-                "游戏名": game_name,       # 新增：冗余字段，直观显示
-                "song_id": internal_sid,
-                "本家": internal_sid_to_home.get(internal_sid, ""),
-                "收录时间": get_standard_date(date),
-                "最新更新时间": current_time
-            })
+            if game_name in game_name_to_id:
+                game_id = game_name_to_id[game_name]
+                dedup_key = (internal_sid, game_id)
+                
+                if dedup_key in gs_pairs:
+                    debug_gs_stats["duplicates_removed"] += 1
+                    continue
+                
+                gs_pairs.add(dedup_key)
+                debug_gs_stats["final_kept"] += 1
+                
+                game_song_rel.append({
+                    "rel_id": raw_sid,
+                    "游戏编号": game_id,
+                    "游戏名": game_name,
+                    "song_id": internal_sid,
+                    "本家": internal_sid_to_home.get(internal_sid, ""),
+                    "收录时间": get_standard_date(date),
+                    "最新更新时间": current_time
+                })
+            else:
+                # 🔥 记录无效游戏名
+                debug_gs_stats["skipped_invalid_game"] += 1
+                invalid_game_counter[game_name] += 1
+                if len(invalid_game_samples[game_name]) < 3:
+                    invalid_game_samples[game_name].append({
+                        "raw_sid": raw_sid,
+                        "song_name": song_name
+                    })
 
         # ============== 歌曲-作者关联（无修改） ==============
         for a_name in real_authors:
@@ -240,10 +263,31 @@ def extract_song_data_v5():
                 })
                 rel_id_counter += 1
 
+    # 🔥 输出详细的无效游戏名调试信息
+    logger.info("\n" + "="*80)
+    logger.info("📊 【游戏-歌曲关联】调试统计")
+    logger.info("="*80)
+    logger.info(f"   原始候选记录数：{debug_gs_stats['total_candidates']:,}")
+    logger.info(f"   跳过（无 internal_sid）：{debug_gs_stats['skipped_no_internal_sid']:,}")
+    logger.info(f"   🔥 跳过（无效游戏名）：{debug_gs_stats['skipped_invalid_game']:,}")
+    logger.info(f"   去重移除：{debug_gs_stats['duplicates_removed']:,} 条")
+    logger.info(f"   最终保留：{debug_gs_stats['final_kept']:,} 条")
+    
+    if invalid_game_counter:
+        logger.info(f"\n   ❌ 无效游戏名统计（按出现次数排序）：")
+        for game_name, count in invalid_game_counter.most_common(20):
+            logger.info(f"      - {game_name}: {count:,} 条")
+            if game_name in invalid_game_samples:
+                samples = invalid_game_samples[game_name]
+                logger.info(f"         样本：{[s['song_name'] for s in samples]}")
+        
+        logger.info(f"\n   💡 提示：请检查 game_info.csv 是否包含以上游戏名！")
+        logger.info(f"   当前 game_info.csv 中的游戏：{list(game_name_to_id.keys())}")
+
     # 5. 导出文件
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "="*80)
     logger.info("步骤5：导出关联表")
-    logger.info("="*60)
+    logger.info("="*80)
     
     # 游戏-歌曲关联表（新增游戏名列）
     df_gs_rel = pd.DataFrame(game_song_rel)
@@ -257,10 +301,10 @@ def extract_song_data_v5():
     pd.DataFrame(columns=["rel_id","游戏1编号","游戏2编号","联动名称","最新更新时间"]).to_csv(OUTPUT_PATHS["game_linkage_rel"], encoding="utf-8-sig", index=False)
 
     # 6. 最终统计
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "="*80)
     logger.info(f"✅ 游戏歌曲关联表：{len(df_gs_rel):,} 条")
     logger.info(f"✅ 歌曲作者关联表：{len(song_author_rel):,} 条")
-    logger.info("="*60)
+    logger.info("="*80)
     logger.info("🎉 关联表生成完成！（数据100% 来自 Core）")
     return True
 
