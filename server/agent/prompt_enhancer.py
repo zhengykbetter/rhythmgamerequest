@@ -1,12 +1,8 @@
+from server.encoding_utils import safe_print
 from agent.config import TABLE_RULES
-# 导入 datetime 模块，满足你的要求
 from datetime import datetime
 
 def get_current_time_info():
-    """
-    提供给LLM的时间信息：当前日期、标准时间格式
-    让LLM知道时间规则，处理更新时间/收录时间查询
-    """
     now = datetime.now()
     return {
         "current_date": now.strftime("%Y-%m-%d"),
@@ -16,12 +12,10 @@ def get_current_time_info():
     }
 
 def get_table_schema_prompt():
-    """
-    表结构 + 时间信息（datetime注入）+ 规则
-    传给LLM的完整系统提示词
-    """
-    # 获取时间信息
+    safe_print(f"      📋 [prompt_enhancer] 生成系统提示词...")
+    
     time_info = get_current_time_info()
+    safe_print(f"      ⏰ [prompt_enhancer] 注入时间: {time_info['current_date']}")
     
     # 基础表结构
     schema_prompt = "数据库表结构如下（仅允许查询这些表）：\n"
@@ -30,7 +24,7 @@ def get_table_schema_prompt():
         fields = list(rule["field_types"].keys())
         schema_prompt += f"表名：{table} | 字段：{', '.join(fields)}\n"
 
-    # 注入 datetime 时间信息（核心！LLM获得时间能力）
+    # 注入 datetime 时间信息
     schema_prompt += f"\n【时间规则（来自datetime模块）】\n"
     schema_prompt += f"1. 当前日期：{time_info['current_date']}\n"
     schema_prompt += f"2. 标准时间格式：{time_info['sql_date_format']}\n"
@@ -44,4 +38,5 @@ def get_table_schema_prompt():
     schema_prompt += "4. 字段名必须严格匹配\n"
     schema_prompt += "5. 时间查询使用标准SQL日期函数"
     
+    safe_print(f"      ✅ [prompt_enhancer] 提示词生成完成，长度: {len(schema_prompt)}")
     return schema_prompt
