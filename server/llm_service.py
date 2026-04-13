@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+# 动态将项目根目录加入模块搜索路径（适配任何部署环境）
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from agent.intent_parser import parse_intent
 from agent.sql_builder import generate_sql
 from agent.prompt_enhancer import build_structured_enhanced_prompt
