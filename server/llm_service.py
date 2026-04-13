@@ -1,7 +1,21 @@
 import sys
 from pathlib import Path
-# 动态将项目根目录加入模块搜索路径（适配任何部署环境）
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+# ==================== 【调试+稳健版】动态添加项目根目录 ====================
+# 1. 先打印当前文件的绝对路径，确认位置
+current_file = Path(__file__).resolve()
+print(f"[DEBUG] llm_service.py 绝对路径: {current_file}")
+
+# 2. 向上找两级，到达 /opt/main_project（项目根目录，agent 就在这里）
+project_root = current_file.parent.parent
+print(f"[DEBUG] 项目根目录: {project_root}")
+print(f"[DEBUG] 项目根目录下是否有 agent: { (project_root / 'agent').exists() }")
+
+# 3. 用 insert(0, ...) 最高优先级插入，避免被其他路径覆盖
+sys.path.insert(0, str(project_root))
+print(f"[DEBUG] 当前 sys.path: {sys.path}")
+# ==========================================================================
+
 
 from agent.intent_parser import parse_intent
 from agent.sql_builder import generate_sql
