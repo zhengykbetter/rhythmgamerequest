@@ -3,9 +3,9 @@ import time
 from sqlalchemy import text
 
 # 🔥 唯一正确的导入（100%匹配你的文件）
-from server.llm_service import generate_sql
-from server.services.db_service import get_mysql_engine
-from server.services.issue_service import add_issue, load_issues
+from server.agent_service import generate_sql_service
+from servee.services.db_service import get_mysql_engine
+from servee.services.issue_service import add_issue, load_issues
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -30,7 +30,7 @@ def query():
     generated_sql = ""
     try:
         # 2. 生成 SQL（调用你真实的函数）
-        generated_sql = generate_sql(user_query)
+        generated_sql = generate_sql_service(user_query)
         if not generated_sql:
             return jsonify({
                 "success": False,
@@ -128,7 +128,7 @@ def get_benchmark_questions():
     获取指定版本的题库列表
     参数：version（默认v1）
     """
-    from server.services.benchmark_service import load_questions
+    from servee.services.benchmark_service import load_questions
     version = request.args.get('version', 'v1')
     questions = load_questions(version)
     return jsonify({"success": True, "data": questions})
@@ -139,7 +139,7 @@ def submit_benchmark():
     提交测试结果
     参数：name（可选）、question_scores（必填，{题目id: 分数}）、version（默认v1）
     """
-    from server.services.benchmark_service import add_contributor
+    from servee.services.benchmark_service import add_contributor
     try:
         data = request.json
         name = data.get('name', '')
@@ -166,7 +166,7 @@ def submit_benchmark_issue():
     提交 Benchmark Issue
     参数：name（必填）、contact（可选）、content（必填）、question_id（可选）、version（默认v1）
     """
-    from server.services.benchmark_service import add_benchmark_issue
+    from servee.services.benchmark_service import add_benchmark_issue
     try:
         data = request.json
         name = data.get('name', '').strip()
@@ -190,7 +190,7 @@ def submit_benchmark_issue():
 def year_today():
     try:
         # 调用新的服务层（唯一改动点）
-        from server.services.history_today_service import get_history_today_data
+        from servee.services.history_today_service import get_history_today_data
         data = get_history_today_data()
         return jsonify({
             "success": True,

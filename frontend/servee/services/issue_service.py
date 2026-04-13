@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from server.config import Config
+from servee.config import Config
 
 def load_issues():
     with open(Config.ISSUES_PATH, "r", encoding="utf-8") as f:

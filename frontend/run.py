@@ -16,7 +16,7 @@ sys.path.insert(0, str(MAIN_PROJECT_ROOT))
 # ==========================================================================
 
 # 导入应用（完全兼容你原有的导入方式）
-from server.app import create_app
+from servee.app import create_app
 
 app = create_app()
 

@@ -10,7 +10,7 @@ PROJECT_ROOT = CURRENT_FILE.parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "frontend"))
 
-from server.services.db_service import get_year_today_songs
+from servee.services.db_service import get_year_today_songs
 from config.settings import CSV_TARGET_DIR
 
 # 缓存配置

@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request
-from server.services.issue_service import add_issue
-from server.services.benchmark_service import get_statistics
+from servee.services.issue_service import add_issue
+from servee.services.benchmark_service import get_statistics
 
 pages_bp = Blueprint('pages', __name__)
 
@@ -19,7 +19,7 @@ def benchmark_welcome():
 
 @pages_bp.route('/benchmark/test')
 def benchmark_test():
-    from server.services.benchmark_service import load_questions
+    from servee.services.benchmark_service import load_questions
     questions = load_questions(version="v1")
     # 新增：打印加载到的题目，终端会直接输出
     print(f"【调试】加载到的题目列表：{questions}")

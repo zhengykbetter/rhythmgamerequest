@@ -1,8 +1,8 @@
 from flask import Flask
-from server.config import Config
-from server.routes.main import main_bp
-from server.routes.api import api_bp
-from server.routes.pages import pages_bp  # <-- 新增
+from servee.config import Config
+from servee.routes.main import main_bp
+from servee.routes.api import api_bp
+from servee.routes.pages import pages_bp  # <-- 新增
 
 def create_app():
     app = Flask(__name__)

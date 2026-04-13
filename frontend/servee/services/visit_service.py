@@ -1,6 +1,6 @@
 import hashlib
 from datetime import date
-from server.config import Config
+from servee.config import Config
 
 def get_visit_count():
     with open(Config.COUNT_PATH, "r") as f:
