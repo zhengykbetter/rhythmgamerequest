@@ -14,10 +14,17 @@ def parse_intent(query: str) -> dict:
 
     try:
         prompt = f"""
-        分析用户查询，输出JSON，无其他内容：
-        1. entities：提取歌曲/作者/游戏实体
-        2. is_complex：是否包含统计/排名/计算/排除（True/False）
-        查询：{query}
+分析用户查询，严格按以下最高优先级规则输出JSON，无其他内容：
+【最高优先级语义规则】
+1. 只要查询出现「X的作者」句式，X必须归类到【歌曲】实体，绝对不能归类到【作者】实体
+2. 只要查询出现「X的歌曲」句式，X必须归类到【作者】实体，绝对不能归类到【歌曲】实体
+
+【输出要求】
+输出严格JSON格式，包含两个字段：
+1. entities：对象，key固定为「歌曲」「作者」「游戏」，value为对应提取到的实体数组
+2. is_complex：布尔值，查询包含统计/排名/计算/排除则为True，否则为False
+
+查询：{query}
         """
         
         print(f"   🔤 [intent_parser] 调用 LLM (意图解析)...")
