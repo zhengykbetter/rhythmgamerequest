@@ -75,10 +75,8 @@ def build_structured_enhanced_prompt(intent_result: dict) -> str:
 
 【SQL生成强制规则】
 1. 必须加 DISTINCT 去重，禁止重复数据
-2. 优先用 song_id / author_id 数字ID关联，禁止用名称匹配
-3. 仅查询目标数据，禁止冗余联表
-4. 严格按实体类型匹配，禁止歌曲名=作者名
-5. 逻辑极简，不输出无关数据
+2. 优先用 song_id / author_id 数字ID关联
+3. 【最高优先级】必须严格优先使用上面提供的「已识别结构化信息」，如果识别到了【歌曲】实体，绝对不能直接把歌曲名当作者名去查 author_info 表。
 7. 子查询可能返回多行数据，**必须用 IN 而不是 =**
 8. 【核心】匹配歌名/别名时：
    - 必须用 TRIM() 去掉首尾空格
