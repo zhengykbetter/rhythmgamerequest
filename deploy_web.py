@@ -34,8 +34,10 @@ if __name__ == "__main__":
 
     print(f"{COLORS['YELLOW']}===== RhythmGameQuery 自动化部署 (重构版) ====={COLORS['NC']}")
     print(f"运行应用根目录: {WEB_APP_DIR}")
+    
+    # 修复：使用原有COLORS，不新增CYAN
     if DEBUG_MODE:
-        print(f"{COLORS['CYAN']}🔧 [DEBUG 模式] 前台运行，实时显示调试信息{COLORS['NC']}")
+        print(f"{COLORS['YELLOW']}🔧 [DEBUG 模式] 前台运行，实时显示调试信息{COLORS['NC']}")
     else:
         print(f"{COLORS['GREEN']}🚀 [正常模式] 后台静默部署{COLORS['NC']}")
 
@@ -50,16 +52,16 @@ if __name__ == "__main__":
 
     # 3. 启动 Gunicorn（核心：区分 debug 模式）
     if DEBUG_MODE:
-        # Debug模式：去掉 -D（后台），加上实时日志输出
+        # Debug模式：去掉 -D（后台），实时输出日志
         gunicorn_cmd = (
             f"{VENV_GUNICORN} -w {GUNICORN_WORKERS} "
             f"--chdir {WEB_APP_DIR} "
             f"--bind {GUNICORN_BIND_HOST}:{GUNICORN_BIND_PORT} "
-            f"--access-logfile - --error-logfile - "  # 实时输出日志到控制台
-            f"{FLASK_APP_ENTRY}"  # 去掉 -D，前台运行
+            f"--access-logfile - --error-logfile - "
+            f"{FLASK_APP_ENTRY}"
         )
-        print(f"\n{COLORS['CYAN']}🔍 Debug 模式已启动，按 Ctrl+C 停止{COLORS['NC']}")
-        print(f"{COLORS['CYAN']}--------------------------------------------------{COLORS['NC']}\n")
+        print(f"\n{COLORS['YELLOW']}🔍 Debug 模式已启动，按 Ctrl+C 停止{COLORS['NC']}")
+        print(f"{COLORS['YELLOW']}--------------------------------------------------{COLORS['NC']}\n")
         run_cmd(gunicorn_cmd, "启动 Gunicorn 调试服务", debug=True)
     else:
         # 正常模式：后台静默运行
@@ -72,7 +74,7 @@ if __name__ == "__main__":
         run_cmd(gunicorn_cmd, "启动 Gunicorn 后端服务", debug=False)
         time.sleep(1)
 
-        # 4. 启动Nginx（仅正常模式启动）
+        # 4. 启动Nginx
         run_cmd("systemctl restart nginx", "重启 Nginx 网关", debug=False)
 
         # 完成
