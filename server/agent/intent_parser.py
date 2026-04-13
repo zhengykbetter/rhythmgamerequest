@@ -1,3 +1,5 @@
+import re
+import json
 from openai import OpenAI
 from agent.config import LLM_CONFIG
 
@@ -8,7 +10,7 @@ def parse_intent(query: str) -> dict:
     
     if not query:
         print(f"   ⚠️  [intent_parser] 输入为空")
-        return {"original": "", "entities": [], "is_complex": False}
+        return {"original": query, "entities": [], "is_complex": False}
 
     try:
         prompt = f"""
@@ -32,14 +34,32 @@ def parse_intent(query: str) -> dict:
         
         print(f"   ✅ [intent_parser] LLM 调用成功")
         print(f"   🔢 [intent_parser] Token 消耗: {token_used}")
-        print(f"   📤 [intent_parser] LLM 输出: {raw_result[:100]}...")
+        print(f"   📤 [intent_parser] LLM 原始输出: {raw_result[:150]}...")
+        
+        # ===================== 【核心修复】解析 JSON =====================
+        # 1. 去掉 ```json 和 ``` 标记
+        json_str = re.sub(r"```json|```", "", raw_result).strip()
+        
+        # 2. 解析成 Python 字典
+        parsed_data = json.loads(json_str)
+        
+        # 3. 提取 entities 和 is_complex
+        entities = parsed_data.get("entities", [])
+        is_complex = parsed_data.get("is_complex", False)
+        
+        print(f"   ✅ [intent_parser] JSON 解析成功")
+        print(f"   📌 [intent_parser] 识别到的歌曲: {entities.get('歌曲', [])}")
+        print(f"   📌 [intent_parser] 识别到的作者: {entities.get('作者', [])}")
+        print(f"   📌 [intent_parser] 识别到的游戏: {entities.get('游戏', [])}")
+        print(f"   📌 [intent_parser] 是否复杂: {is_complex}")
         
         return {
             "original": query,
-            "entities": [],
-            "is_complex": False,
+            "entities": entities,
+            "is_complex": is_complex,
             "raw_result": raw_result
         }
     except Exception as e:
         print(f"   ❌ [intent_parser] 出错: {str(e)}")
+        # 兜底：解析失败也不崩溃
         return {"original": query, "entities": [], "is_complex": False}
