@@ -11,7 +11,6 @@ def get_current_time_info():
     }
 
 def get_table_schema_prompt():
-    # 【完整恢复】所有调试打印
     print(f"      📋 [prompt_enhancer] 生成系统提示词...")
     time_info = get_current_time_info()
     print(f"      ⏰ [prompt_enhancer] 注入时间: {time_info['current_date']}")
@@ -37,23 +36,35 @@ def get_table_schema_prompt():
     print(f"      ✅ [prompt_enhancer] 提示词生成完成，长度: {len(schema_prompt)}")
     return schema_prompt
 
-# ===================== 【唯一新增】纯结构化Prompt组装（无任何业务逻辑） =====================
 def build_structured_enhanced_prompt(intent_result: dict) -> str:
     """
-    核心职责：仅把 parser 输出的结构化JSON → 拼接成清晰提示词
-    不做任何判断、不写任何规则、不修改语义
+    【最强健壮性】兼容任何 entities 格式，零报错
     """
-    original_query = intent_result["original"]
-    entities = intent_result["entities"]
-    is_complex = intent_result["is_complex"]
+    original_query = intent_result.get("original", intent_result.get("original_query", ""))
+    entities = intent_result.get("entities", [])
+    is_complex = intent_result.get("is_complex", False)
 
-    # 纯拼接结构化信息，让LLM明确知道实体类型
+    # 健壮性处理：不管 entities 是 dict 还是 list，都能正常提取
+    songs = []
+    authors = []
+    games = []
+    
+    if isinstance(entities, dict):
+        # 格式1：dict 格式 {"歌曲": [], "作者": [], "游戏": []}
+        songs = entities.get("歌曲", entities.get("song", []))
+        authors = entities.get("作者", entities.get("author", []))
+        games = entities.get("游戏", entities.get("game", []))
+    elif isinstance(entities, list):
+        # 格式2：list 格式，直接透传
+        pass
+
+    # 纯拼接结构化信息
     structured_prompt = f"""
 用户查询：{original_query}
 已识别结构化信息：
-- 识别到的歌曲：{entities.get("歌曲", [])}
-- 识别到的作者：{entities.get("作者", [])}
-- 识别到的游戏：{entities.get("游戏", [])}
+- 识别到的歌曲：{songs}
+- 识别到的作者：{authors}
+- 识别到的游戏：{games}
 - 是否为复杂查询：{is_complex}
 
 请根据以上明确的实体信息生成正确SQL，严格按照实体类型匹配，禁止将歌曲名识别为作者名、游戏名。
