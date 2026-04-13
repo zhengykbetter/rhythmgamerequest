@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-完全修复版：Debug模式下也启动Nginx，100%复现生产环境
+修复版：彻底清理端口占用，确保Debug模式正常启动
 """
 import subprocess
 import time
@@ -19,12 +19,32 @@ from config.settings import (
 
 VENV_GUNICORN = "/opt/main_project/venv/bin/gunicorn"
 
-def run_cmd(cmd, desc, debug=False, block=False):
-    print(f"{COLORS['GREEN']}[INFO]{COLORS['NC']} {desc}")
+def run_cmd(cmd, desc, debug=False, block=False, silent=False):
+    if not silent:
+        print(f"{COLORS['GREEN']}[INFO]{COLORS['NC']} {desc}")
     if debug and block:
         subprocess.run(cmd, shell=True)
     else:
         subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def kill_processes():
+    """彻底清理所有相关进程和端口占用"""
+    print(f"{COLORS['YELLOW']}[INFO] 正在彻底清理旧进程和端口占用...{COLORS['NC']}")
+    
+    # 1. 强制杀掉所有 gunicorn 进程
+    run_cmd("pkill -9 -f gunicorn 2>/dev/null", "", silent=True)
+    time.sleep(0.3)
+    
+    # 2. 强制杀掉所有占用 8000 端口的进程（根据你的端口调整）
+    run_cmd(f"lsof -t -i:{GUNICORN_BIND_PORT} | xargs -r kill -9 2>/dev/null", "", silent=True)
+    time.sleep(0.3)
+    
+    # 3. 再次确认清理
+    run_cmd("pkill -f gunicorn 2>/dev/null", "", silent=True)
+    run_cmd("pkill -f nginx 2>/dev/null", "", silent=True)
+    time.sleep(0.5)
+    
+    print(f"{COLORS['GREEN']}[INFO] 清理完成！{COLORS['NC']}")
 
 if __name__ == "__main__":
     DEBUG_MODE = len(sys.argv) > 1 and sys.argv[1].lower() == "debug"
@@ -37,10 +57,8 @@ if __name__ == "__main__":
     else:
         print(f"{COLORS['GREEN']}🚀 [正常模式] 后台静默部署{COLORS['NC']}")
 
-    # 1. 清理进程
-    run_cmd("pkill -f gunicorn 2>/dev/null", "清理旧进程")
-    run_cmd("pkill -f nginx 2>/dev/null", "清理Nginx")
-    time.sleep(0.5)
+    # 【关键修复】彻底清理进程和端口
+    kill_processes()
 
     # 2. 权限
     run_cmd(f"chmod -R 755 {MAIN_REPO_ROOT}", "修复权限")
@@ -48,7 +66,7 @@ if __name__ == "__main__":
 
     # 3. 启动 Gunicorn
     if DEBUG_MODE:
-        # Debug模式：后台启动Gunicorn（让Nginx能连上）+ 实时看日志
+        # Debug模式：后台启动Gunicorn + 实时看日志
         gunicorn_cmd = (
             f"{VENV_GUNICORN} -w {GUNICORN_WORKERS} "
             f"--chdir {WEB_APP_DIR} "
@@ -59,7 +77,7 @@ if __name__ == "__main__":
         run_cmd(gunicorn_cmd, "启动 Gunicorn 后端服务")
         time.sleep(1)
         
-        # 4. 启动Nginx（和生产环境完全一致）
+        # 4. 启动Nginx
         run_cmd("systemctl restart nginx", "重启 Nginx 网关")
         
         print(f"\n{COLORS['YELLOW']}🔍 Debug 模式已启动！{COLORS['NC']}")
