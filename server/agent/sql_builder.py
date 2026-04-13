@@ -28,10 +28,10 @@ def generate_sql(query: str) -> str:
         
         print(f"   ✅ [sql_builder] LLM 调用成功")
         print(f"   🔢 [sql_builder] Token 消耗: {token_used}")
-        print(f"   📄 [sql_builder] 原始输出: {raw_sql[:100]}...")
+        print(f"   📄 [sql_builder] 原始输出: {raw_sql}...")
         
         sql = re.sub(r"```sql|```", "", raw_sql).strip()
-        print(f"   🧹 [sql_builder] 清洗后 SQL: {sql[:100]}...")
+        print(f"   🧹 [sql_builder] 清洗后 SQL: {sql}...")
         
         print(f"   🔍 [sql_builder] 调用 validator 校验...")
         is_valid = validate_sql_safety(sql)
