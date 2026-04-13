@@ -15,7 +15,7 @@ TABLE_RULES = {
         "field_types": {
             "游戏编号": "VARCHAR(100)",
             "游戏": "VARCHAR(200)",
-            "别名": "VARCHAR(200)",
+            "别名": "TEXT",
             "实装时间": "DATE",
             "更新时间": "DATE",
             "数据时间": "DATE",
@@ -31,9 +31,9 @@ TABLE_RULES = {
         "date_cols": [],
         "field_types": {
             "author_id": "VARCHAR(50)",
-            "作者名": "VARCHAR(1000)",
-            "别名": "VARCHAR(500)",
-            "备注": "VARCHAR(500)",
+            "作者名": "TEXT",
+            "别名": "TEXT",
+            "备注": "TEXT",
             "最新更新时间": "DATETIME",
             "update_timestamp": "DATETIME"
         },
