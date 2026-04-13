@@ -80,17 +80,23 @@ def build_structured_enhanced_prompt(intent_result: dict) -> str:
      1. 直接通过 `song_author_rel` 从歌曲找 `author_id`
      2. 绝对不要查 `author_info` 表！
      3. 不要绕弯子，逻辑越简单越好
-1. 必须加 DISTINCT 去重，禁止重复数据
-2. 优先用 song_id / author_id 数字ID关联，禁止用名称匹配
-3. 仅查询目标数据，禁止冗余联表
-4. 严格按实体类型匹配，禁止歌曲名=作者名
-5. 逻辑极简，不输出无关数据
-6. 查询结果必须同时返回：歌名、别名 两个字段
+0.1 【最高优先级·多实体同时满足】
+   🔴 禁止使用 INTERSECT（运行极慢）！
+   ✅ 所有「A和B」「同时包含」场景，固定写法：
+   1. JOIN 关联表（song_author_rel/game_song_rel）
+   2. WHERE 筛选目标名称
+   3. GROUP BY 主键+展示字段
+   4. HAVING COUNT(DISTINCT 关联ID) = 目标数量
+   5. 禁止乱用 DISTINCT（GROUP BY 已去重）
+
+1. 优先用 song_id / author_id 数字ID关联
+2. 仅查询目标数据，禁止冗余联表
+3. 严格按实体类型匹配，禁止歌曲名=作者名
+4. 匹配名称时：TRIM去空格 + LOWER转小写
+5. MySQL语法规范：GROUP BY 包含所有SELECT非聚合字段
+6. 逻辑极简，不输出无关数据
 7. 子查询可能返回多行数据，必须用 IN 而不是 =
-8. 匹配歌名/别名时：
-   - 必须用 TRIM() 去掉首尾空格
-   - 必须用 LOWER() 统一转小写
-   - 用 = 精确匹配，禁止用 LIKE 模糊匹配
+
 
 ====================
 
