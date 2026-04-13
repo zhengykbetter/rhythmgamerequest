@@ -40,9 +40,11 @@ def generate_sql_service(natural_query: str) -> str:
 # 本地测试入口
 if __name__ == "__main__":
     print("=== Agent NL2SQL 服务 (调试版) ===")
-    while True:
+    x = 10
+    while x>0:
         q = input("\n请输入查询：")
         if q in ["exit", "退出"]:
             print("👋 再见！")
             break
         generate_sql_service(q)
+        x = x - 1
