@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-核心数据提取脚本 V3.0（集成 unitoken.csv 统一逻辑）
-✅ 功能：
-1. 读取 unitoken.csv 统一作者Token
-2. 按【歌名Token相同 + 统一作者Token有交集】去重生成唯一歌曲表
-3. 按【统一作者Token】去重生成唯一作者表
-4. 导出中间映射文件（原始song_id → 内部song_id）
+核心数据提取脚本 V4.0（基于全量映射解耦逻辑）
 """
 import os
 import sys
@@ -24,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ===================== 路径配置（新增 unitoken.csv） =====================
+# ===================== 路径配置 =====================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAIN_PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 sys.path.insert(0, MAIN_PROJECT_ROOT)
@@ -37,13 +32,11 @@ from config.settings import (
 
 RAW_SONG_CSV_PATH = os.path.join(CSV_TARGET_DIR, RAW_SONG_CSV_FILENAME)
 SONG_TOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "songtoken.csv")
-UNITOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "unitoken.csv")  # 新增：统一Token表
+UNITOKEN_CSV_PATH = os.path.join(CSV_TARGET_DIR, "unitoken.csv")
 
-# 核心输出路径
 OUTPUT_PATHS = {
     "song_info": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["song_info"]),
     "author_info": os.path.join(CSV_TARGET_DIR, OUTPUT_CSV_FILENAMES["author_info"]),
-    # 中间映射文件（供关联表脚本使用）
     "temp_song_key_map": os.path.join(CSV_TARGET_DIR, "temp_song_key_map.csv")
 }
 
@@ -78,166 +71,209 @@ def merge_aliases(existing, new):
 def get_current_datetime():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-# ===================== 新增：unitoken.csv 读取与映射构建 =====================
-def build_unitoken_map(unitoken_path):
-    """
-    读取 unitoken.csv，构建【原始作者Token → 统一作者Token】的映射
-    如果原始Token不在映射中，则返回自身
-    """
-    if not os.path.exists(unitoken_path):
-        logger.warning(f"unitoken.csv 不存在，将使用原始作者Token")
-        return {}
-    
-    try:
-        df_unitoken = pd.read_csv(unitoken_path, encoding="utf-8-sig", dtype=str)
-        unitoken_map = dict(zip(df_unitoken["原始Token"], df_unitoken["统一Token"]))
-        logger.info(f"✅ 成功读取 unitoken.csv：共 {len(unitoken_map)} 条统一映射")
-        return unitoken_map
-    except Exception as e:
-        logger.error(f"读取 unitoken.csv 失败：{str(e)}，将使用原始作者Token")
-        return {}
-
-def get_unified_token(original_token, unitoken_map):
-    """获取统一后的作者Token，无映射则返回原始Token"""
-    return unitoken_map.get(original_token, original_token)
-
-# ===================== 核心业务逻辑（集成 unitoken） =====================
+# ===================== 核心业务逻辑 =====================
 def extract_core_data():
-    # 1. 读取数据
-    if not os.path.exists(RAW_SONG_CSV_PATH):
-        logger.error(f"原始文件不存在 → {RAW_SONG_CSV_PATH}")
-        return False
-    if not os.path.exists(SONG_TOKEN_CSV_PATH):
-        logger.error(f"Token文件不存在 → {SONG_TOKEN_CSV_PATH}")
-        return False
+    current_time = get_current_datetime()
 
+    # 1. 读取所有输入数据
+    logger.info("读取输入数据...")
     df_raw = pd.read_csv(RAW_SONG_CSV_PATH, encoding="utf-8", dtype=str, na_filter=True)
     df_token = pd.read_csv(SONG_TOKEN_CSV_PATH, encoding="utf-8-sig", dtype=str)
-    df_raw = df_raw.merge(df_token[["song_id", "歌名token", "作者token"]], on="song_id", how="left")
+    df_unitoken = pd.read_csv(UNITOKEN_CSV_PATH, encoding="utf-8-sig", dtype=str)
 
-    # 2. 读取 unitoken 映射
-    logger.info("读取 unitoken.csv 统一作者Token...")
-    unitoken_map = build_unitoken_map(UNITOKEN_CSV_PATH)
-
-    # 清洗
-    for col in ["song_id", "歌名", "作者", "真实作者", "歌名token", "作者token"]:
+    # 清洗基础数据
+    for col in ["song_id", "歌名", "作者", "真实作者", "别名", "本家"]:
         df_raw[col] = df_raw[col].apply(clean_string)
     df_raw = df_raw[df_raw["song_id"] != ""].reset_index(drop=True)
 
-    # 3. 初始化存储
-    # 歌曲存储结构：Key=歌名token → Value=[(统一作者token集合, 歌曲数据)]
-    song_map = defaultdict(list)
-    # 中间映射：原始song_id → 内部song_id
-    raw_sid_to_internal_sid = {}
-    # 作者存储：Key=统一作者token → Value=作者数据
-    author_token_map = {}
-    song_id_counter = 1
-    author_id_counter = 999999
-    current_time = get_current_datetime()
+    # 2. 构建 unitoken 全局映射
+    logger.info("构建 unitoken 全局映射...")
+    # 原始Token -> (统一Token, 统一作者名, 原始作者名)
+    alias_to_main_map = dict(zip(
+        df_unitoken["原始Token"],
+        zip(df_unitoken["统一Token"], df_unitoken["统一作者名"], df_unitoken["原始作者名"])
+    ))
+    # 统一Token -> (标准主名, 别名集合)
+    main_token_info = defaultdict(lambda: {"main_name": "", "aliases": set()})
+    for _, row in df_unitoken.iterrows():
+        main_tok = row["统一Token"]
+        main_name = row["统一作者名"]
+        alias_name = row["原始作者名"]
+        main_token_info[main_tok]["main_name"] = main_name
+        if alias_name != main_name:
+            main_token_info[main_tok]["aliases"].add(alias_name)
 
-    # ===================== 构建去重后的歌曲&作者（使用统一Token） =====================
-    logger.info("构建唯一歌曲/作者库（歌名Token相同+统一作者Token有交集 → 同一首歌）...")
+    # 3. 全量作者 token 归集与身份锁定
+    logger.info("全量作者 token 归集...")
+    # 展开所有作者 token
+    all_raw_tokens = set()
+    song_token_map = {}  # song_id -> (歌名token, 原始作者token列表)
+    for _, row in df_token.iterrows():
+        sid = row["song_id"]
+        song_tok = row["歌名token"]
+        auth_toks = parse_author_tokens(row["作者token"])
+        song_token_map[sid] = (song_tok, auth_toks)
+        all_raw_tokens.update(auth_toks)
+
+    # 生成 token -> 统一Token 的全局映射，同时归集无映射 token 的名称
+    token_to_unified = {}
+    # 先处理有 unitoken 映射的
+    for raw_tok in all_raw_tokens:
+        if raw_tok in alias_to_main_map:
+            main_tok, _, _ = alias_to_main_map[raw_tok]
+            token_to_unified[raw_tok] = main_tok
+        else:
+            token_to_unified[raw_tok] = raw_tok  # 无映射则自身为统一Token
+
+    # 补充无映射 token 的作者名（从 raw_song 匹配）
+    # 构建 raw_token -> 作者名列表 的辅助映射
+    token_name_candidates = defaultdict(list)
     for _, row in df_raw.iterrows():
-        raw_sid = row["song_id"]
-        song_name = row["歌名"]
-        nominal_author = row["作者"]
-        song_token = row["歌名token"]
-        
-        # 解析原始作者Token，并替换为统一Token
-        original_auth_tokens = parse_author_tokens(row["作者token"])
-        unified_auth_tokens = [get_unified_token(tok, unitoken_map) for tok in original_auth_tokens]
-        real_authors = parse_author_tokens(row["真实作者"]) or [nominal_author]
-
-        # 基础过滤
-        if not song_token or not unified_auth_tokens or not song_name:
+        sid = row["song_id"]
+        if sid not in song_token_map:
             continue
-        
-        unified_auth_set = frozenset(unified_auth_tokens)
-        internal_sid = None
-        found_existing = False
+        _, auth_toks = song_token_map[sid]
+        real_authors = parse_author_tokens(row["真实作者"]) or [row["作者"]]
+        # 简单对齐，token 优先取对应位置的名字，没有则取第一个
+        for i, tok in enumerate(auth_toks):
+            if i < len(real_authors):
+                token_name_candidates[tok].append(real_authors[i])
+            else:
+                token_name_candidates[tok].append(real_authors[0] if real_authors else "")
 
-        # ============== 歌曲查重：同歌名Token + 统一作者Token有交集 ==============
-        if song_token in song_map:
-            # 遍历同歌名Token下的所有已存歌曲，检查统一作者Token交集
-            for idx, (existing_unified_auth_set, existing_song) in enumerate(song_map[song_token]):
-                if existing_unified_auth_set & unified_auth_set:  # 统一作者集合有交集
-                    # 合并到现有歌曲
-                    internal_sid = existing_song["song_id"]
-                    
-                    # 合并别名
-                    existing_song["别名"] = merge_aliases(existing_song["别名"], row["别名"])
-                    
-                    # 合并本家（冲突检测+更新）
-                    existing_home = clean_string(existing_song["本家"])
-                    new_home = clean_string(row["本家"])
-                    if existing_home and new_home and existing_home != new_home:
-                        logger.error(f"本家冲突 | 歌曲:{song_name} | {existing_home} vs {new_home}")
-                    elif not existing_home and new_home:
-                        existing_song["本家"] = new_home
-                    
-                    # 更新已存歌曲的统一作者集合（合并，扩大后续匹配范围）
-                    merged_unified_auth_set = existing_unified_auth_set | unified_auth_set
-                    song_map[song_token][idx] = (merged_unified_auth_set, existing_song)
-                    
-                    found_existing = True
+    # 完善 main_token_info 中无映射 token 的信息
+    for raw_tok in all_raw_tokens:
+        main_tok = token_to_unified[raw_tok]
+        if main_tok not in main_token_info:
+            # 无映射的独立作者
+            candidates = token_name_candidates.get(raw_tok, [])
+            main_name = next((x for x in candidates if x), raw_tok)
+            aliases = set(x for x in candidates if x and x != main_name)
+            main_token_info[main_tok] = {"main_name": main_name, "aliases": aliases}
+        else:
+            # 有映射的，补充从 raw_song 里发现的新别名
+            candidates = token_name_candidates.get(raw_tok, [])
+            main_name = main_token_info[main_tok]["main_name"]
+            for name in candidates:
+                if name and name != main_name:
+                    main_token_info[main_tok]["aliases"].add(name)
+
+    # 4. 生成 author_info 表
+    logger.info("生成 author_info 表...")
+    author_id_counter = 999999
+    author_list = []
+    unified_to_aid = {}  # 统一Token -> author_id
+    for main_tok in sorted(main_token_info.keys()):
+        info = main_token_info[main_tok]
+        aid = f"{author_id_counter:06d}"
+        author_id_counter -= 1
+        unified_to_aid[main_tok] = aid
+        author_list.append({
+            "author_id": aid,
+            "作者名": info["main_name"],
+            "别名": " / ".join(sorted(info["aliases"])),
+            "备注": "",
+            "最新更新时间": current_time
+        })
+    df_author = pd.DataFrame(author_list).sort_values("author_id", ascending=False)
+
+    # 5. 歌曲查重与合并
+    logger.info("歌曲查重与合并...")
+    # 合并 raw_song 和 token 信息
+    song_data_list = []
+    for _, row in df_raw.iterrows():
+        sid = row["song_id"]
+        if sid not in song_token_map:
+            continue
+        song_tok, raw_auth_toks = song_token_map[sid]
+        # 转换为统一Token集合
+        unified_auth_set = frozenset(token_to_unified[t] for t in raw_auth_toks if t in token_to_unified)
+        song_data_list.append({
+            "raw_sid": sid,
+            "song_tok": song_tok,
+            "unified_auth_set": unified_auth_set,
+            "歌名": row["歌名"],
+            "别名": row["别名"],
+            "作者": row["作者"],
+            "本家": row["本家"]
+        })
+
+    # 按歌名token预分组
+    song_groups = defaultdict(list)
+    for data in song_data_list:
+        song_groups[data["song_tok"]].append(data)
+
+    # 组内查重合并
+    song_id_counter = 1
+    final_songs = []
+    raw_sid_map = {}
+
+    for song_tok, group in song_groups.items():
+        # 合并簇：列表的每个元素是 (合并后的统一Token集合, 歌曲数据列表)
+        clusters = []
+        for song in group:
+            matched = False
+            for i, (cluster_set, cluster_songs) in enumerate(clusters):
+                if song["unified_auth_set"] & cluster_set:
+                    # 合并到簇
+                    new_set = cluster_set | song["unified_auth_set"]
+                    cluster_songs.append(song)
+                    clusters[i] = (new_set, cluster_songs)
+                    matched = True
                     break
+            if not matched:
+                clusters.append((song["unified_auth_set"], [song]))
 
-        # 没找到现有歌曲，创建新歌
-        if not found_existing:
+        # 处理每个合并簇
+        for cluster_set, cluster_songs in clusters:
             internal_sid = f"{song_id_counter:06d}"
             song_id_counter += 1
-            new_song = {
+
+            # 合并信息
+            base_song = cluster_songs[0]
+            merged_alias = base_song["别名"]
+            merged_home = base_song["本家"]
+
+            for song in cluster_songs[1:]:
+                merged_alias = merge_aliases(merged_alias, song["别名"])
+                # 本家冲突检测
+                if merged_home and song["本家"] and merged_home != song["本家"]:
+                    logger.error(f"本家冲突 | 歌曲:{base_song['歌名']} | {merged_home} vs {song['本家']}")
+                elif not merged_home and song["本家"]:
+                    merged_home = song["本家"]
+
+                # 记录原始id映射
+                raw_sid_map[song["raw_sid"]] = internal_sid
+
+            # 记录第一首的原始id
+            raw_sid_map[base_song["raw_sid"]] = internal_sid
+
+            final_songs.append({
                 "song_id": internal_sid,
-                "歌名": song_name,
-                "别名": row["别名"],
-                "作者": nominal_author,
-                "本家": row["本家"],
+                "歌名": base_song["歌名"],
+                "别名": merged_alias,
+                "作者": base_song["作者"],
+                "本家": merged_home,
                 "最新更新时间": current_time
-            }
-            song_map[song_token].append((unified_auth_set, new_song))
+            })
 
-        # 记录原始song_id到内部song_id的映射
-        raw_sid_to_internal_sid[raw_sid] = internal_sid
-
-        # ============== 作者去重：基于统一作者Token ==============
-        for a_name, original_a_tok in zip(real_authors, original_auth_tokens):
-            unified_a_tok = get_unified_token(original_a_tok, unitoken_map)
-            if not unified_a_tok:
-                continue
-            if unified_a_tok not in author_token_map:
-                aid = f"{author_id_counter:06d}"
-                author_id_counter -= 1
-                author_token_map[unified_a_tok] = {
-                    "author_id": aid,
-                    "作者名": a_name
-                }
-
-    # ===================== 导出文件 =====================
-    # 歌曲表（从song_map中提取所有歌曲数据）
-    all_songs = []
-    for song_list in song_map.values():
-        for _, song_data in song_list:
-            all_songs.append(song_data)
-    df_song = pd.DataFrame(all_songs).sort_values("song_id")
+    # 6. 导出文件
+    logger.info("导出文件...")
+    # 歌曲表
+    df_song = pd.DataFrame(final_songs).sort_values("song_id")
     df_song = df_song[["song_id", "歌名", "别名", "作者", "本家", "最新更新时间"]]
     df_song.to_csv(OUTPUT_PATHS["song_info"], encoding="utf-8-sig", index=False)
 
     # 作者表
-    df_author = pd.DataFrame(author_token_map.values()).sort_values("author_id", ascending=False)
-    df_author["别名"] = ""
-    df_author["备注"] = ""
-    df_author["最新更新时间"] = current_time
-    df_author = df_author[["author_id", "作者名", "别名", "备注", "最新更新时间"]]
     df_author.to_csv(OUTPUT_PATHS["author_info"], encoding="utf-8-sig", index=False)
 
-    # 中间映射文件：原始song_id → 内部song_id
-    df_key_map = pd.DataFrame(list(raw_sid_to_internal_sid.items()), columns=["raw_song_id", "internal_song_id"])
+    # 映射表
+    df_key_map = pd.DataFrame(list(raw_sid_map.items()), columns=["raw_song_id", "internal_song_id"])
     df_key_map.to_csv(OUTPUT_PATHS["temp_song_key_map"], encoding="utf-8", index=False)
 
-    # ===================== 最终输出 =====================
     logger.info("="*60)
-    logger.info(f"✅ 作者表(author_info)：{len(df_author):,} 条（基于统一Token去重）")
-    logger.info(f"✅ 歌曲表(song_info)：{len(df_song):,} 条（基于统一作者Token查重）")
+    logger.info(f"✅ 作者表(author_info)：{len(df_author):,} 条")
+    logger.info(f"✅ 歌曲表(song_info)：{len(df_song):,} 条")
     logger.info(f"✅ 中间映射文件：{len(df_key_map):,} 条")
     logger.info("="*60)
     logger.info("🎉 核心数据提取完成！")
